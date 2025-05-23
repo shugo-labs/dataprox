@@ -35,7 +35,7 @@ class FloodDetector:
 
         # Initialize MongoDB connection
         #self.client = MongoClient(f"mongodb://{username}:{password}@{host}/admin?replicaSet=replicaset&tls=true")
-        self.client = MongoClient(f"mongodb://{host}/")
+        self.client = MongoClient("mongodb://127.0.0.1:27017/")
 
         self.db = self.client[database]
         self.collection = self.db[collection]

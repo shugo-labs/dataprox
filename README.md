@@ -26,7 +26,7 @@
 This repository is the **data collection codebase for Bittensor Subnet 91**. To learn more about the Bittensor project and the underlying mechanics, [read here.](https://docs.bittensor.com/)
 
 <br/>
-<div align="center">
+<div align="left">
 
 # Overview
 

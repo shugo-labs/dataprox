@@ -100,7 +100,7 @@ The TrafficLogger component captures network traffic features and stores them in
 Run the traffic generator on tgen machines:
 
 ```
-./run_traffic.sh <interface> <moat_private_ip> <private_ip> <node_index> <total_duration>
+nohup bash run_traffic.sh <interface> <moat_private_ip> <private_ip> <node_index> <total_duration> > /tmp/run_traffic.log 2>&1 &
 ```
 
 **Parameters:**

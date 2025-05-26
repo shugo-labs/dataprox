@@ -22,9 +22,57 @@ with open('/tmp/playlist.json', 'w') as f:
     json.dump(playlist, f)
 "
 
-# Step 3: Run traffic generator with playlist
-nohup python3 traffic_generator_training.py \
-  --playlist /tmp/playlist.json \
-  --receiver-ips 10.0.0.1 \
-  --interface ipip-tgen-$node_index \
-  > /tmp/traffic_generator.log 2>&1 &
+# Step 3: Read and loop over each item in playlist.json, one at a time
+python3 - <<EOF
+import json
+import subprocess
+import time
+import signal
+import os
+
+with open('/tmp/playlist.json') as f:
+    playlist = json.load(f)
+
+for entry in playlist:
+    class_vector = entry['class_vector']
+    duration = entry['duration']
+
+    print(f"Starting traffic generation: class_vector={class_vector}, duration={duration}s")
+
+    # Start the traffic generator process
+    proc = subprocess.Popen(
+        ["python3", "traffic_generator_training.py", class_vector,
+        "--duration", str(duration),
+        "--receiver-ips", "10.0.0.1",
+        "--interface", f"ipip-tgen-{node_index}"],
+        preexec_fn=os.setsid  # <- this makes it a process group leader
+    )
+
+    # Sleep for the duration of this traffic pattern
+    time.sleep(duration)
+
+    # Kill the process if still running
+    if proc.poll() is None:
+        print(f"Terminating traffic generator: class_vector={class_vector}")
+        proc.terminate()
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            proc.wait(timeout=5)
+            subprocess.run(["pkill", "-9", "-f", "traffic_generator_training.py"])
+            time.sleep(2)
+        except subprocess.TimeoutExpired:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            print("Forcefully killed the traffic generator group.")
+
+    # Remove lingering traffic shaping lock
+    lock_file = "/tmp/traffic_shaping.lock"
+    if os.path.exists(lock_file):
+        try:
+            os.remove(lock_file)
+            print("Lock file removed.")
+        except Exception as e:
+            print(f"Failed to remove lock file: {e}")
+
+
+print("All traffic patterns completed.")
+EOF

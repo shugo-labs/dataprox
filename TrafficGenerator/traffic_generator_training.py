@@ -6,7 +6,6 @@ This module provides both attack and benign traffic simulation capabilities with
 parameters for network testing, performance evaluation, and security assessments.
 """
 
-import json
 import asyncio
 import argparse
 import array
@@ -23,10 +22,12 @@ import struct
 import sys
 import time
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from enum import Enum, auto
 from multiprocessing import Event, Process, cpu_count
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 
 # Third-party imports
 from faker import Faker
@@ -615,47 +616,30 @@ class Attack(ABC):
                 frame: Current stack frame.
             """
             logger.info(f"Duration exceeded ({self.duration}s). Terminating attack.")
-            # self.terminate_all_processes()
-            self.pause_event.set()  # Signal the attack to stop
+            self.terminate_all_processes()
+            raise SystemExit(0)  # Exit cleanly on timeout
         
         def terminate_all_processes() -> None:
             """Terminate all processes associated with this attack."""
-            logger.info("Attempting to terminate processes.")
+            logger.info("Script completed.")
             current_pid = os.getpid()
             try:
-                # Send SIGTERM to the current process group, excluding the current process
-                pgid = os.getpgid(current_pid)
-                for pid in os.listdir('/proc'):
-                    if pid.isdigit():
-                        pid = int(pid)
-                        try:
-                            if os.getpgid(pid) == pgid and pid != current_pid:
-                                os.kill(pid, signal.SIGTERM)
-                                logger.info(f"Sent SIGTERM to process {pid}")
-                        except OSError:
-                            # Process may have already terminated
-                            pass
+                # Send SIGTERM to the current process group
+                os.killpg(os.getpgid(current_pid), signal.SIGTERM)
             except Exception as e:
                 logger.error(f"Failed to terminate processes: {e}")
-            finally:
-                logger.info("Process termination attempt completed.")
-
         
         # Set up signal for enforcing the duration
         signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(self.duration)
+        signal.alarm(self.duration)  # Set alarm for the duration
         
-        # If not running in parallel benign mode, acquire the shaping lock.
-        if not (getattr(self, "parallel", False) and self.traffic_type == TrafficType.BENIGN):
-            if not self.traffic_shaper.acquire_lock():
-                return
+        if not self.traffic_shaper.acquire_lock():
+            return
         
         try:
             # Set the process group ID to allow group termination
             os.setpgid(0, 0)
-            # Only setup traffic shaping if not running as parallel benign.
-            if not (getattr(self, "parallel", False) and self.traffic_type == TrafficType.BENIGN):
-                self.traffic_shaper.setup_shaping(self.packet_loss, self.jitter)
+            self.traffic_shaper.setup_shaping(self.packet_loss, self.jitter)
             self.start_time = time.time()
             
             logger.info(f"Executing attack: {self.__class__.__name__} targeting {self.target_ips}")
@@ -665,9 +649,8 @@ class Attack(ABC):
                 logger.info(f"Attack {self.__class__.__name__} stopped after {self.duration}s.")
         finally:
             signal.alarm(0)  # Disable alarm
-            if not (getattr(self, "parallel", False) and self.traffic_type == TrafficType.BENIGN):
-                self.traffic_shaper.remove_shaping()
-                self.traffic_shaper.release_lock()
+            self.traffic_shaper.remove_shaping()
+            self.traffic_shaper.release_lock()
             terminate_all_processes()
             logger.info("Script completed.")
 
@@ -945,7 +928,7 @@ class TCPTraffic(BenignTraffic):
             window_size = random.randint(8192, 65535)
             flags = random.choice(['S', 'SA', 'FA', 'P', 'R'])
             tcp_options = [
-                ('MSS', 1460),
+                ('MSS', 1405),
                 ('NOP', None),
                 ('WScale', random.randint(0, 14)),
                 ('Timestamp', (random.randint(0, 100000), 0))
@@ -1501,7 +1484,7 @@ class TCPAsyncSlowSYNFlood(TCPAttack):
         
         # Calculate maximum payload size to respect MTU
         header_size = 20 + 20  # IP + TCP headers
-        max_payload_size = self.interface_mtu - header_size if self.interface_mtu else 1460
+        max_payload_size = self.interface_mtu - header_size if self.interface_mtu else 1405
         limited_payload = payload[:max_payload_size]
         
         # Using scapy for better control over packet structure
@@ -3323,26 +3306,16 @@ class UDPEncryptedPayloadFlood(UDPAttack):
             sock.close()
 
 
-def get_attack_types() -> Tuple[List[str], List[str]]:
-    """Get lists of available attack and benign traffic types.
-    
-    Returns:
-        Tuple of (attack_types, benign_types) lists.
-    """
-    attack_types = []
-    benign_types = []
-    
-    for key, cls in get_attack_classes().items():
-        if cls.traffic_type == TrafficType.ATTACK:
-            attack_types.append(key)
-        elif cls.traffic_type == TrafficType.BENIGN:
-            benign_types.append(key)
-    
-    return attack_types, benign_types
-
 
 def get_attack_classes() -> Dict[str, Type[Attack]]:
-    """Get all available attack classes."""
+    """Get all available attack classes.
+    
+    Returns:
+        Dictionary mapping attack type names to their class implementations.
+    """
+    # In a real implementation, this would dynamically discover all attack classes
+    # For this example, we're just returning a predefined dictionary
+    
     return {
         'udp_traffic': UDPTraffic,
         'tcp_traffic': TCPTraffic,
@@ -3370,118 +3343,92 @@ def get_attack_classes() -> Dict[str, Type[Attack]]:
         'udp_hybrid_flood': UDPHybridFlood,
         'udp_dynamic_payload_flood': UDPDynamicPayloadFlood,
         'udp_encrypted_payload_flood': UDPEncryptedPayloadFlood,
+
     }
 
 
-# NEW helper: Run an attack instance in a new process (used for parallel benign attacks)
-def run_attack_instance(attack_class, target_ips, interface, duration, min_port, max_port):
-    attack_instance = attack_class(
-        target_ips=target_ips,
-        interface=interface,
-        duration=duration,
-        pause_event=Event(),
-        min_port=min_port,
-        max_port=max_port
-    )
-    # Mark instance as running in parallel so that traffic shaping is skipped
-    attack_instance.parallel = True
-    attack_instance.execute()
+def get_attack_types() -> Tuple[List[str], List[str]]:
+    """Get lists of available attack and benign traffic types.
+    
+    Returns:
+        Tuple of (attack_types, benign_types) lists.
+    """
+    attack_types = []
+    benign_types = []
+    
+    for key, cls in get_attack_classes().items():
+        if cls.traffic_type == TrafficType.ATTACK:
+            attack_types.append(key)
+        elif cls.traffic_type == TrafficType.BENIGN:
+            benign_types.append(key)
+    
+    return attack_types, benign_types
 
 
 def main() -> None:
     """Main entry point for the traffic generator."""
     parser = argparse.ArgumentParser(description="Unified Network Traffic Generator")
     
+    # Retrieve attack and benign types
+    attack_types, benign_types = get_attack_types()
+    all_attack_types = attack_types + benign_types
+    
+    # Positional argument for attack_type
+    parser.add_argument('attack_type', choices=all_attack_types, help="Type of traffic to generate")
+    
     # Named arguments
-    parser.add_argument('--playlist', type=str, required=True, 
-                        help="Path to the JSON file containing the playlists.")
+    parser.add_argument('--duration', type=int, default=600, 
+                       help="Duration of the traffic generation in seconds (default: 600)")
+    parser.add_argument('--dport-min', type=int, default=None, 
+                       help="Minimum destination port number")
+    parser.add_argument('--dport-max', type=int, default=None, 
+                       help="Maximum destination port number")
     parser.add_argument('--receiver-ips', type=str, required=True, 
                        help="Comma-separated list of target IP addresses")
     parser.add_argument('--interface', type=str, required=True, 
-                        help="Network interface to use.")
+                       help="Network interface to use")
     
     args = parser.parse_args()
-
+    
+    # Validate port range if provided
+    if (args.dport_min is not None and args.dport_max is None) or \
+       (args.dport_min is None and args.dport_max is not None):
+        logger.error("Both --dport-min and --dport-max must be provided together.")
+        sys.exit(1)
+    
+    if args.dport_min is not None and args.dport_max is not None:
+        if not (1 <= args.dport_min <= 65535) or not (1 <= args.dport_max <= 65535):
+            logger.error("Port numbers must be in the range 1-65535.")
+            sys.exit(1)
+        if args.dport_min > args.dport_max:
+            logger.error("--dport-min cannot be greater than --dport-max.")
+            sys.exit(1)
+    
     # Parse target IPs
     target_ips = [ip.strip() for ip in args.receiver_ips.split(",") if ip.strip()]
     if not target_ips:
         logger.error("No valid IPs provided in --receiver-ips.")
         sys.exit(1)
-
-    # Load the playlist from the given JSON file
-    try:
-        with open(args.playlist, 'r') as file:
-            playlist = json.load(file)
-    except Exception as e:
-        logger.error(f"Failed to load playlists file: {e}")
+    
+    # Get the appropriate attack class
+    attack_classes = get_attack_classes()
+    attack_class = attack_classes.get(args.attack_type.lower())
+    if not attack_class:
+        logger.error(f"Error: Attack type '{args.attack_type}' is not recognized.")
         sys.exit(1)
     
-    # NEW: Determine playlist structure.
-    # If any entry has a "classes" key, assume the JSON is in the new parallel benign format.
-    if isinstance(playlist, list):
-        if any("classes" in entry for entry in playlist):
-            playlist_entries = playlist  # Use as is.
-        else:
-            # Group by class_vector as before.
-            grouped_playlist = {}
-            for entry in playlist:
-                key = entry.get('class_vector')
-                if key:
-                    grouped_playlist.setdefault(key, []).append(entry)
-            playlist_entries = []
-            for key, entries in grouped_playlist.items():
-                playlist_entries.extend(entries)
-    else:
-        # If not a list, assume it's already grouped.
-        playlist_entries = []
-        for key, entries in playlist.items():
-            playlist_entries.extend(entries)
+    # Instantiate and execute the attack
+    attack_instance = attack_class(
+        target_ips=target_ips,
+        interface=args.interface,
+        duration=args.duration,
+        pause_event=Event(),
+        min_port=args.dport_min,
+        max_port=args.dport_max
+    )
     
-    attack_classes = get_attack_classes()
+    attack_instance.execute()
 
-    # Process each entry in the playlist
-    for entry in playlist_entries:
-        # If the entry has a "classes" key, run those benign attacks in parallel.
-        if "classes" in entry:
-            benign_processes = []
-            for sub_entry in entry["classes"]:
-                attack_class = attack_classes.get(sub_entry["class_vector"].lower())
-                if not attack_class:
-                    logger.error(f"Error: Traffic type '{sub_entry['class_vector']}' is not recognized.")
-                    continue
-                logger.info(f"Starting parallel benign traffic generation for: {entry['name']} "
-                            f"({sub_entry['class_vector']}) with duration: {sub_entry.get('duration', 10)} seconds")
-                p = Process(target=run_attack_instance, args=(
-                    attack_class,
-                    target_ips,
-                    args.interface,
-                    sub_entry.get("duration", 10),
-                    sub_entry.get("min_port", 1),
-                    sub_entry.get("max_port", 65535)
-                ))
-                p.start()
-                benign_processes.append(p)
-            for p in benign_processes:
-                p.join()
-        else:
-            # Standard single attack entry processing.
-            attack_class = attack_classes.get(entry["class_vector"].lower())
-            if not attack_class:
-                logger.error(f"Error: Traffic type '{entry['class_vector']}' is not recognized.")
-                continue
-            
-            logger.info(f"Starting traffic generation for: {entry['name']} "
-                        f"({entry['class_vector']}) with duration: {entry.get('duration', 10)} seconds")
-            
-            attack_instance = attack_class(
-                target_ips=target_ips,
-                interface=args.interface,
-                duration=entry.get("duration", 10),
-                pause_event=Event(),
-                min_port=entry.get("min_port", 1),
-                max_port=entry.get("max_port", 65535)
-            )
-            attack_instance.execute()
-            
+
 if __name__ == "__main__":
     main()

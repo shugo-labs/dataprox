@@ -40,6 +40,7 @@ It contains two primary components for traffic generation and traffic feature co
 
 # Repository Structure
 
+```
 data-collection/
 ├── TrafficGenerator/          # Traffic generation component
 │   ├── traffic_generator_training.py
@@ -50,6 +51,7 @@ data-collection/
 │   ├── collect_features.py
 │   └── run_data_collection.sh # Setup and execution script
 └── README.md
+```
 
 # Components
 

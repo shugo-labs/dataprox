@@ -50,6 +50,7 @@ data-collection/
 ├── TrafficLogger/            # Traffic logging and feature collection
 │   ├── collect_features.py
 │   └── run_data_collection.sh # Setup and execution script
+│── .env.example #MongoDB inputs
 └── README.md
 ```
 
@@ -58,37 +59,39 @@ data-collection/
 ## Traffic Generator
 
 The TrafficGenerator component is designed to run on tgen (traffic generation) machines and simulate various network traffic patterns.
-Key Features:
 
-GRE tunnel setup for network isolation
-Playlist-based traffic generation
-Configurable traffic patterns and duration
-Support for multiple network interfaces
+**Key Features:**
 
-Dependencies:
+* GRE tunnel setup for network isolation  
+* Playlist-based traffic generation  
+* Configurable traffic patterns and duration  
+* Support for multiple network interfaces 
 
-Python 3.10
-faker
-scapy
-pycryptodome
+**Dependencies:**
+
+- Python 3.10
+- faker
+- scapy
+- pycryptodome
 
 ## Traffic Logger
 
 The TrafficLogger component captures network traffic features and stores them in a MongoDB database for analysis and model training.
-Key Features:
 
-Real-time traffic feature extraction
-MongoDB integration for data persistence
-System monitoring capabilities
-Process management with PM2
+**Key Features:**
 
-Dependencies:
+* Real-time traffic feature extraction
+* MongoDB integration for data persistence
+* System monitoring capabilities
+* Process management with PM2
 
-tcpdump, tshark
-sysstat, ifstat, dstat, vnstat
-snmpd
-Python packages: scapy, pandas, numpy, psutil, websockets, asyncio, pymongo, python-dotenv
-Node.js and PM2
+**Dependencies:**
+
+- tcpdump, tshark
+- sysstat, ifstat, dstat, vnstat
+- snmpd
+- Python packages: scapy, pandas, numpy, psutil, websockets, asyncio, pymongo, python-dotenv
+- Node.js and PM2
 
 # Usage
 
@@ -100,20 +103,20 @@ Run the traffic generator on tgen machines:
 ./run_traffic.sh <interface> <moat_private_ip> <private_ip> <node_index> <total_duration>
 ```
 
-Parameters:
+**Parameters:**
 
-interface: Network interface to use
-moat_private_ip: MOAT server private IP address
-private_ip: Local machine private IP
-node_index: Unique identifier for the tgen node
-total_duration: Traffic generation duration in seconds
+- interface: Network interface to use
+- moat_private_ip: MOAT server private IP address
+- private_ip: Local machine private IP
+- node_index: Unique identifier for the tgen node
+- total_duration: Traffic generation duration in seconds
 
-What it does:
+**What it does:**
 
-Installs required Python packages
-Sets up GRE tunneling configuration
-Generates a randomized traffic playlist
-Starts traffic generation in background mode
+* Installs required Python packages
+* Sets up GRE tunneling configuration
+* Generates a randomized traffic playlist
+* Starts traffic generation in background mode
 
 ## TrafficLogger Setup and Execution
 
@@ -134,22 +137,22 @@ MONGODB_COLLECTION=
 ./run_data_collection.sh
 ```
 
-What it does:
+**What it does:**
 
-Updates system packages and installs monitoring tools
-Installs required Python dependencies
-Configures system services (sysstat, snmpd)
-Starts feature collection process using PM2
+* Updates system packages and installs monitoring tools
+* Installs required Python dependencies
+* Configures system services (sysstat, snmpd)
+* Starts feature collection process using PM2
 
 ### Data Output
 
 The TrafficLogger component captures and stores the following traffic features:
 
-Packet statistics (count, size, timing)
-Protocol distribution
-Flow characteristics
-System resource utilization
-Network interface metrics
+* Packet statistics (count, size, timing)
+* Protocol distribution
+* Flow characteristics
+* System resource utilization
+* Network interface metrics
 
 Data is stored in MongoDB collections for easy querying and analysis.
 

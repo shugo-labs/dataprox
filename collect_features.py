@@ -2,7 +2,7 @@ import os
 import time
 import pandas as pd
 import numpy as np
-from scapy.all import sniff, IP, UDP, TCP, GRE
+from scapy.all import sniff, IP, UDP, TCP, GRE, Raw
 from datetime import datetime
 import threading
 import psutil
@@ -416,21 +416,100 @@ class FloodDetector:
             
 
     def safe_decode_payload(self, packet):
+        """Enhanced payload decoding with better GRE support and debugging."""
         try:
+            payload_data = None
+            
             if packet.haslayer(GRE):
-                # For GRE packets, try to decode the tunneled payload
+                #print("DEBUG: Processing GRE packet")
                 gre_layer = packet[GRE]
-                if gre_layer.payload:
-                    return bytes(gre_layer.payload).decode('utf-8', errors='ignore')
-                return None
+                
+                # Try to get the raw payload from GRE
+                if hasattr(gre_layer, 'payload') and gre_layer.payload:
+                    # Check if there's a Raw layer in the GRE payload
+                    if gre_layer.payload.haslayer(Raw):
+                        raw_data = bytes(gre_layer.payload[Raw])
+                        #print(f"DEBUG: Found Raw layer in GRE, length: {len(raw_data)}")
+                        payload_data = raw_data
+                    # Check if the tunneled packet has UDP with payload
+                    elif gre_layer.payload.haslayer(UDP):
+                        udp_layer = gre_layer.payload[UDP]
+                        if hasattr(udp_layer, 'payload') and udp_layer.payload:
+                            if udp_layer.payload.haslayer(Raw):
+                                raw_data = bytes(udp_layer.payload[Raw])
+                                #print(f"DEBUG: Found Raw layer in tunneled UDP, length: {len(raw_data)}")
+                                payload_data = raw_data
+                            else:
+                                raw_data = bytes(udp_layer.payload)
+                                #print(f"DEBUG: Found UDP payload, length: {len(raw_data)}")
+                                payload_data = raw_data
+                    # Check if the tunneled packet has TCP with payload
+                    elif gre_layer.payload.haslayer(TCP):
+                        tcp_layer = gre_layer.payload[TCP]
+                        if hasattr(tcp_layer, 'payload') and tcp_layer.payload:
+                            if tcp_layer.payload.haslayer(Raw):
+                                raw_data = bytes(tcp_layer.payload[Raw])
+                                #print(f"DEBUG: Found Raw layer in tunneled TCP, length: {len(raw_data)}")
+                                payload_data = raw_data
+                            else:
+                                raw_data = bytes(tcp_layer.payload)
+                                #print(f"DEBUG: Found TCP payload, length: {len(raw_data)}")
+                                payload_data = raw_data
+                    else:
+                        # Try to get raw bytes from the entire GRE payload
+                        raw_data = bytes(gre_layer.payload)
+                        #print(f"DEBUG: Using entire GRE payload, length: {len(raw_data)}")
+                        payload_data = raw_data
+                        
             elif packet.haslayer(UDP):
-                return bytes(packet[UDP].payload).decode('utf-8', errors='ignore')
+                #print("DEBUG: Processing UDP packet")
+                if hasattr(packet[UDP], 'payload') and packet[UDP].payload:
+                    if packet[UDP].payload.haslayer(Raw):
+                        payload_data = bytes(packet[UDP].payload[Raw])
+                        #print(f"DEBUG: Found Raw layer in UDP, length: {len(payload_data)}")
+                    else:
+                        payload_data = bytes(packet[UDP].payload)
+                        #print(f"DEBUG: Found UDP payload, length: {len(payload_data)}")
+                        
             elif packet.haslayer(TCP):
-                return bytes(packet[TCP].payload).decode('utf-8', errors='ignore')
-            else:
-                return None
-        except UnicodeDecodeError:
-            return None  # Handle undecodable payloads
+                #print("DEBUG: Processing TCP packet")
+                if hasattr(packet[TCP], 'payload') and packet[TCP].payload:
+                    if packet[TCP].payload.haslayer(Raw):
+                        payload_data = bytes(packet[TCP].payload[Raw])
+                        #print(f"DEBUG: Found Raw layer in TCP, length: {len(payload_data)}")
+                    else:
+                        payload_data = bytes(packet[TCP].payload)
+                        #print(f"DEBUG: Found TCP payload, length: {len(payload_data)}")
+            
+            # Try to decode the payload
+            if payload_data:
+                try:
+                    decoded = payload_data.decode('utf-8', errors='ignore').strip()
+                    #print(f"DEBUG: Successfully decoded payload: '{decoded}'")
+                    return decoded
+                except Exception as decode_error:
+                    #print(f"DEBUG: UTF-8 decode failed: {decode_error}")
+                    # Try with different encodings
+                    for encoding in ['ascii', 'latin1']:
+                        try:
+                            decoded = payload_data.decode(encoding, errors='ignore').strip()
+                            #print(f"DEBUG: Successfully decoded with {encoding}: '{decoded}'")
+                            return decoded
+                        except:
+                            continue
+                    
+                    # If all decoding fails, try to find printable characters
+                    printable_chars = ''.join(chr(b) for b in payload_data if 32 <= b <= 126)
+                    if printable_chars:
+                        #print(f"DEBUG: Extracted printable chars: '{printable_chars}'")
+                        return printable_chars
+            
+            #print("DEBUG: No payload data found")
+            return None
+            
+        except Exception as e:
+            print(f"DEBUG: Exception in safe_decode_payload: {e}")
+            return None
 
     def calculate_statistics(self, data):
         """ Calculate common statistics for a given list of numbers. """
@@ -468,7 +547,7 @@ class FloodDetector:
             if len(self.labels) > 0 :
 
                 count_labels = Counter(self.labels)
-                attack_counts = {label: count for label, count in count_labels.items() if label in ["UDP_FLOOD", "TCP_SYN_FLOOD", "GRE_FLOOD"]}
+                attack_counts = {label: count for label, count in count_labels.items() if label in ["UDP_FLOOD", "TCP_SYN_FLOOD"]}
                 benign_counts = {label: count for label, count in count_labels.items() if label == "BENIGN"}
 
                 if attack_counts :

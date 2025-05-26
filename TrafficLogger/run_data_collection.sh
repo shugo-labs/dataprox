@@ -15,4 +15,4 @@ systemctl enable --now snmpd
 pm2 kill && pm2 flush
 
 # Start the data capture script in the background
-pm2 start "python3 TrafficLogger/collect_features.py" --name collect_features
+pm2 start "python3 collect_features.py" --name collect_features

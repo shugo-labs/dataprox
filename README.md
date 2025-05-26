@@ -9,7 +9,7 @@
 
 <div align="center">
 
-# **DBprox: SN91** <!-- omit in toc -->
+# **Δataprox: SN91** <!-- omit in toc -->
 [![Discord Chat](https://img.shields.io/discord/308323056592486420.svg)](https://discord.gg/bittensor)
 [![Creative Commons Badge](https://img.shields.io/badge/Creative%20Commons-ED592F?logo=creativecommons&logoColor=fff&style=for-the-badge)](https://creativecommons.org/licenses/by-nc/4.0/deed.en)
 
@@ -30,7 +30,7 @@ This repository is the **data collection codebase for Bittensor Subnet 91**. To 
 
 # Overview
 
-DBprox is a comprehensive data collection tool suite designed to provide a ready-to-use framework for data generation/collection which will be used to build DDoS protection models. 
+Δataprox is a comprehensive data collection tool suite designed to provide a ready-to-use framework for data generation/collection which will be used to build DDoS protection models. 
 
 This repository provides infrastructure for:
     -> Synthetic Attack Generation: Creating realistic traffic patterns for testing DDoS protection systems

@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 
 class FloodDetector:
 
-    AGG_INTERVAL = 10
+    AGG_INTERVAL = 1
     CONNECTIONS = set()  # Use a set to keep track of active WebSocket connections
 
     def __init__(self):
@@ -148,7 +148,7 @@ class FloodDetector:
         
     def monitor_system_metrics(self):
         while True:
-            self.cpu_util = psutil.cpu_percent(interval=1)
+            self.cpu_util = psutil.cpu_percent(interval=None)
             self.mem_util = psutil.virtual_memory().percent
 
             # Get file descriptor limits using resource module
@@ -169,7 +169,7 @@ class FloodDetector:
             net_stats = psutil.net_io_counters()
             self.packet_drop = (net_stats.dropin + net_stats.dropout)
 
-            time.sleep(self.AGG_INTERVAL - 1)  # Adjust sleep to account for the 1-second interval above
+            time.sleep(self.AGG_INTERVAL)  # Adjust sleep to account for the 1-second interval above
 
     def capture_packets(self):
 
@@ -343,14 +343,13 @@ class FloodDetector:
 
                     # Decode payload safely
                     payload = self.safe_decode_payload(packet)
-
-                    if payload and len(payload) > 0:
-                        parts = payload.split('-')
-                        if len(parts) > 0:
-                            label = parts[0]  # This gets the label part of your payload
-                            self.labels.append(label)
-                    else:
-                        self.labels.append(None)
+                    label = None
+                    if payload:
+                        for keyword in ("TCP_SYN_FLOOD", "UDP_FLOOD", "BENIGN"):
+                            if keyword in payload:
+                                label = keyword
+                                break
+                    self.labels.append(label)
 
             except Exception as e:
                 self.log_error(f"Error in processing packets: {e}")

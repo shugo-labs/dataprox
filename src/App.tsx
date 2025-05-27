@@ -1,41 +1,58 @@
 import React, { useState } from 'react';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 import {
   AppBar,
   Box,
   Container,
-  CssBaseline,
   Paper,
   Tab,
   Tabs,
-  ThemeProvider,
   Toolbar,
   Typography,
-  createTheme,
 } from '@mui/material';
 import TrafficGenerator from './components/TrafficGenerator';
 import DataCollection from './components/DataCollection';
+import logo from './assets/shugo-logo.png'; // Make sure to add your logo to src/assets/
 
 const theme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#ED592F',
+      main: '#B2FFFF', // shugo.io bright purple
+    },
+    secondary: {
+      main: '#7871a0', // shugo.io bright purple
     },
     background: {
-      default: '#121212',
-      paper: '#1E1E1E',
+      default: '#1B1B3A',  // dark blue-purple background
+      paper: '#29294D',    // slightly lighter paper
     },
     text: {
-      primary: '#ffffff',
-      secondary: '#b3b3b3',
+      primary: '#E6E6FA',  // light lavender-ish white text
+      secondary: '#B0A9C3', // muted lavender-gray text
+    },
+  },
+  typography: {
+    fontFamily: `'Poppins', 'Roboto', 'Helvetica Neue', Arial, sans-serif`,
+    h6: {
+      fontWeight: 600,
+      letterSpacing: '0.03em',
+    },
+    body1: {
+      fontWeight: 400,
+    },
+    button: {
+      textTransform: 'none',
+      fontWeight: 600,
     },
   },
   components: {
     MuiCssBaseline: {
       styleOverrides: {
         body: {
-          backgroundColor: '#121212',
-          color: '#ffffff',
+          backgroundColor: '#1B1B3A',
+          color: '#E6E6FA',
         },
       },
     },
@@ -78,20 +95,33 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ 
-        flexGrow: 1,
-        minHeight: '100vh',
-        bgcolor: 'background.default',
-        color: 'text.primary'
-      }}>
-        <AppBar position="static">
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <AppBar position="static" elevation={0} sx={{ 
+          backgroundColor: 'background.paper',
+          borderBottom: '1px solid',
+          borderColor: 'divider'
+        }}>
           <Toolbar>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Δataprox Dashboard
+            Δataprox by Shugo.io
             </Typography>
+            <Box
+              component="img"
+              src={logo}
+              alt="Shugo Logo"
+              sx={{
+                height: 40,
+                width: 'auto',
+                cursor: 'pointer',
+                '&:hover': {
+                  opacity: 0.8,
+                },
+              }}
+              onClick={() => window.open('https://shugo.io', '_blank')}
+            />
           </Toolbar>
         </AppBar>
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Container component="main" sx={{ flexGrow: 1, py: 4 }}>
           <Paper 
             sx={{ 
               width: '100%',

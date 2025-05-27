@@ -31,7 +31,7 @@ interface ProcessDetails {
 interface LogFile {
   name: string;
   size: number;
-  lastModified: string;
+  created: string;
 }
 
 const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
@@ -82,7 +82,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
 
   const fetchLogFiles = async () => {
     try {
-      const response = await axios.get('/api/traffic-generator/logs');
+      const response = await axios.get('/api/logs');
       if (Array.isArray(response.data)) {
         setLogFiles(response.data);
       } else {
@@ -331,12 +331,13 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
             type="password"
             value={formData.sshPassword}
             onChange={handleInputChange}
+            helperText="Password if using pwd authentication"
           />
         </Grid>
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label="SSH Key Path (optional)"
+            label="SSH Key Path"
             name="sshKeyPath"
             value={formData.sshKeyPath}
             onChange={handleInputChange}
@@ -427,7 +428,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         </Button>
         <Button
           variant="contained"
-          color="error"
+          color="secondary"
           fullWidth
           onClick={handleStop}
           disabled={loading || stopping}
@@ -486,7 +487,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
               >
                 <ListItemText
                   primary={file.name}
-                  secondary={`${(file.size / 1024).toFixed(2)} KB - ${new Date(file.lastModified).toLocaleString()}`}
+                  secondary={`${(file.size / 1024).toFixed(2)} KB - ${new Date(file.created).toLocaleString()}`}
                 />
               </ListItem>
             ))}

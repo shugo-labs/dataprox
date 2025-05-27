@@ -1,13 +1,14 @@
 {
   "files": {
     "main.css": "/static/css/main.cf7dd05d.css",
-    "main.js": "/static/js/main.9fb0512e.js",
+    "main.js": "/static/js/main.dd7c10b2.js",
+    "static/media/shugo-logo.png": "/static/media/shugo-logo.f9a25214670628e1a7c7.png",
     "index.html": "/index.html",
     "main.cf7dd05d.css.map": "/static/css/main.cf7dd05d.css.map",
-    "main.9fb0512e.js.map": "/static/js/main.9fb0512e.js.map"
+    "main.dd7c10b2.js.map": "/static/js/main.dd7c10b2.js.map"
   },
   "entrypoints": [
     "static/css/main.cf7dd05d.css",
-    "static/js/main.9fb0512e.js"
+    "static/js/main.dd7c10b2.js"
   ]
 }

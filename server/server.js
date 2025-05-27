@@ -162,14 +162,18 @@ app.get('/api/logs', (req, res) => {
   try {
     const files = fs.readdirSync(logsDir)
       .filter(file => file.endsWith('.log'))
-      .map(file => ({
-        name: file,
-        path: `/api/logs/${file}`,
-        size: fs.statSync(path.join(logsDir, file)).size,
-        created: fs.statSync(path.join(logsDir, file)).birthtime
-      }));
+      .map(file => {
+        const stats = fs.statSync(path.join(logsDir, file));
+        return {
+          name: file,
+          path: `/api/logs/${file}`,
+          size: stats.size,
+          created: stats.birthtime.toISOString() // Convert to ISO string for proper date handling
+        };
+      });
     res.json(files);
   } catch (error) {
+    console.error('Error listing logs:', error);
     res.status(500).json({ error: 'Failed to list logs' });
   }
 });
@@ -459,6 +463,21 @@ MONGODB_COLLECTION=${mongodbCollection}`;
   } catch (error) {
     console.error('Data Collection Error:', error);
     res.status(500).json({ error: 'Failed to start data collection' });
+  }
+});
+
+// Delete log file endpoint
+app.delete('/api/traffic-generator/logs/:filename', (req, res) => {
+  try {
+    const filePath = path.join(logsDir, req.params.filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Log file not found' });
+    }
+    fs.unlinkSync(filePath);
+    res.json({ message: 'Log file deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting log file:', error);
+    res.status(500).json({ error: 'Failed to delete log file' });
   }
 });
 

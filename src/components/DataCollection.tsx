@@ -137,12 +137,13 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
             type="password"
             value={formData.sshPassword}
             onChange={handleInputChange}
+            helperText="Password file if using pwd authentication"
           />
         </Grid>
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label="SSH Key Path (optional)"
+            label="SSH Key Path"
             name="sshKeyPath"
             value={formData.sshKeyPath}
             onChange={handleInputChange}

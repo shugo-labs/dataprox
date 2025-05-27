@@ -1,4 +1,3 @@
-
 <picture>
     <source srcset="./assets/shugo_white.png" media="(prefers-color-scheme: dark)">
     <source srcset="./assets/shugo_black.png" media="(prefers-color-scheme: light)">
@@ -176,3 +175,78 @@ Join our [Discord](https://discord.gg/bittensor) for community support and discu
 ---
 
 **Disclaimer**: Tensorprox is an experimental DDoS mitigation network. Always conduct thorough testing in controlled environments.
+
+# Dataprox Dashboard
+
+A modern web interface for managing traffic generation and data collection in the Dataprox project.
+
+## Features
+
+- Traffic Generator Control
+  - Configure and run traffic generation scripts
+  - Monitor traffic generation status
+  - View logs and output
+
+- Data Collection Management
+  - Configure MongoDB connection settings
+  - Start/stop data collection
+  - Monitor collection status
+  - View collection logs
+
+## Prerequisites
+
+- Node.js 16.x or later
+- npm 7.x or later
+- MongoDB instance for data collection
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd dataprox
+```
+
+2. Install frontend dependencies:
+```bash
+npm install
+```
+
+3. Install backend dependencies:
+```bash
+cd server
+npm install
+```
+
+## Running the Application
+
+1. Start the backend server:
+```bash
+cd server
+npm start
+```
+
+2. In a new terminal, start the frontend development server:
+```bash
+npm start
+```
+
+The dashboard will be available at `http://localhost:3000`
+
+## Development
+
+- Frontend: React with TypeScript and Material-UI
+- Backend: Express.js
+- API endpoints:
+  - POST `/api/traffic-generator/run`: Start traffic generation
+  - POST `/api/data-collection/run`: Start data collection
+
+## Security Notes
+
+- The dashboard requires proper authentication and authorization
+- MongoDB credentials are stored securely in environment variables
+- All API endpoints should be protected with appropriate middleware
+
+## License
+
+Licensed under the Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0).# dataprox

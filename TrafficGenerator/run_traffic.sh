@@ -41,7 +41,7 @@ for entry in playlist:
 
     # Start the traffic generator process
     proc = subprocess.Popen(
-        ["python3", "/root/dataprox/TrafficGenerator/traffic_generator_training.py", class_vector,
+        ["python3", "/home/borgg/dataprox/TrafficGenerator/traffic_generator_training.py", class_vector,
         "--duration", str(duration),
         "--receiver-ips", "10.0.0.1",
         "--interface", f"ipip-tgen-${node_index}"],
@@ -58,7 +58,7 @@ for entry in playlist:
         try:
             os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
             proc.wait(timeout=5)
-            subprocess.run(["pkill", "-9", "-f", "/root/dataprox/TrafficGenerator/traffic_generator_training.py"])
+            subprocess.run(["pkill", "-9", "-f", "/home/borgg/dataprox/TrafficGenerator/traffic_generator_training.py"])
             time.sleep(2)
         except subprocess.TimeoutExpired:
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)

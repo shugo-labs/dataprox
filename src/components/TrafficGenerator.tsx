@@ -428,7 +428,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         </Button>
         <Button
           variant="contained"
-          color="secondary"
+          color="error"
           fullWidth
           onClick={handleStop}
           disabled={loading || stopping}

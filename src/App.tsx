@@ -19,7 +19,7 @@ const theme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#B2FFFF', // shugo.io bright purple
+      main: '#03FFF6', // shugo.io bright purple
     },
     secondary: {
       main: '#7871a0', // shugo.io bright purple
@@ -102,9 +102,19 @@ function App() {
           borderColor: 'divider'
         }}>
           <Toolbar>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Δataprox by Shugo.io
-            </Typography>
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{
+              flexGrow: 1,
+              fontFamily: `'Inter', 'Poppins', 'Roboto', 'Helvetica Neue', Arial, sans-serif`,
+              fontWeight: 600,
+              letterSpacing: '0.02em',
+            }}
+          >
+            Δataprox by Shugo
+          </Typography>
+
             <Box
               component="img"
               src={logo}

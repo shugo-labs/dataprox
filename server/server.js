@@ -356,27 +356,15 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     // Run the traffic generator script with proper process group handling
     console.log('Running traffic generator script...');
     const command = `cd ~/dataprox/TrafficGenerator && bash -c '
-      # Function to kill process group
-      cleanup() {
-        local pid=$1
-        if [ -n "$pid" ]; then
-          pkill -P $pid
-          kill $pid 2>/dev/null
-        fi
-      }
+      timestamp=$(date +%s)
+      pidfile="/tmp/traffic_${timestamp}.pid"
+      logfile="${remoteLogFile}"
 
-      # Start the traffic generator script in a new process group
-      setsid bash run_traffic.sh ${interface} ${moatPrivateIp} ${privateIp} ${nodeIndex} ${totalDuration} > ${remoteLogFile} 2>&1 &
-      TRAFFIC_PID=$!
-      echo $TRAFFIC_PID > /tmp/traffic_${timestamp}.pid
-
-      # Wait for the specified duration
-      sleep ${totalDuration}
-
-      # Cleanup after duration
-      cleanup $TRAFFIC_PID
+      # Start the traffic generator with nohup and in background
+      nohup bash run_traffic.sh ${interface} ${moatPrivateIp} ${privateIp} ${nodeIndex} ${totalDuration} > "$logfile" 2>&1 &
+      echo $! > "$pidfile"
     '`;
-    
+
     // Execute the command
     const result = await ssh.execCommand(command);
     console.log('Script execution result:', result);

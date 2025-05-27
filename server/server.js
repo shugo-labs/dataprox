@@ -299,7 +299,7 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     
     // Make sure the script is executable
     console.log('Making script executable...');
-    await ssh.execCommand('chmod +x /home/borgg/dataprox/TrafficGenerator/run_traffic.sh');
+    await ssh.execCommand('chmod +x ~/dataprox/TrafficGenerator/run_traffic.sh');
     
     // Create a unique log file name
     const timestamp = new Date().getTime();
@@ -351,7 +351,7 @@ app.post('/api/traffic-generator/run', async (req, res) => {
 
     // Run the traffic generator script with proper process group handling
     console.log('Running traffic generator script...');
-    const command = `cd /home/borgg/dataprox/TrafficGenerator && bash -c '
+    const command = `cd ~/dataprox/TrafficGenerator && bash -c '
       # Function to kill process group
       cleanup() {
         local pid=$1

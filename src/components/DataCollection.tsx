@@ -323,16 +323,6 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
                         >
                           Stop
                         </Button>
-                        <Button
-                          variant="outlined"
-                          color="error"
-                          size="small"
-                          onClick={() => handleStopMachine(instance.machineIp)}
-                          disabled={stopping}
-                          startIcon={stopping ? <CircularProgress size={16} /> : null}
-                        >
-                          Stop All on Machine
-                        </Button>
                       </Box>
                     </TableCell>
                   </TableRow>

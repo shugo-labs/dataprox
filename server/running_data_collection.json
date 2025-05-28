@@ -1,1 +1,15 @@
-[]
+[
+  {
+    "pid": "70517",
+    "startTime": "2025-05-28T15:30:06.057Z",
+    "sshConfig": {
+      "sshHost": "172.234.63.93",
+      "sshUsername": "root",
+      "sshPassword": "",
+      "sshKeyPath": "/home/borgg/.ssh/ovh"
+    },
+    "status": "running",
+    "machineIp": "172.234.63.93",
+    "instanceKey": "172.234.63.93"
+  }
+]

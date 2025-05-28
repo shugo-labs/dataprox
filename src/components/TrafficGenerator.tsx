@@ -364,17 +364,6 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
           <Typography variant="h6">
             Running Instances ({runningInstances.length})
           </Typography>
-          {runningInstances.length > 0 && (
-            <Button
-              variant="contained"
-              color="error"
-              onClick={handleStop}
-              disabled={stopping}
-              startIcon={stopping ? <CircularProgress size={20} /> : null}
-            >
-              Stop All Instances
-            </Button>
-          )}
         </Box>
         <TableContainer>
           <Table size="small">

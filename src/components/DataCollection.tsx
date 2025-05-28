@@ -63,6 +63,16 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
     }
   }, [success]);
 
+  // Add effect for auto-clearing connection status
+  useEffect(() => {
+    if (connectionStatus) {
+      const timer = setTimeout(() => {
+        setConnectionStatus(null);
+      }, 5000); // Clear after 5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [connectionStatus]);
+
   // Add effect for fetching and verifying running instances
   useEffect(() => {
     fetchRunningInstances();
@@ -273,14 +283,6 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         <Typography variant="h5">
           Data Collection Configuration
         </Typography>
-        <Button
-          variant="outlined"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          startIcon={refreshing ? <CircularProgress size={20} /> : null}
-        >
-          Refresh Instances
-        </Button>
       </Box>
 
       {/* Running Instances Section */}
@@ -289,17 +291,6 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
           <Typography variant="h6">
             Running Instances ({runningInstances.length})
           </Typography>
-          {runningInstances.length > 0 && (
-            <Button
-              variant="contained"
-              color="error"
-              onClick={handleStopAllInstances}
-              disabled={stopping}
-              startIcon={stopping ? <CircularProgress size={20} /> : null}
-            >
-              Stop All Instances
-            </Button>
-          )}
         </Box>
         <TableContainer>
           <Table size="small">

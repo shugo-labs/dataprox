@@ -279,6 +279,13 @@ const activeStreams = new Map();
 wss.on('connection', (ws) => {
   console.log('New WebSocket connection');
   
+  // Send initial connection message with auto-clear
+  ws.send(JSON.stringify({
+    type: 'log',
+    content: 'Successfully connected to the data collection machine!',
+    autoClear: true  // Add flag to indicate this message should auto-clear
+  }));
+  
   ws.on('message', (message) => {
     const data = JSON.parse(message);
     if (data.type === 'subscribe' && data.logFile) {
@@ -293,7 +300,8 @@ wss.on('connection', (ws) => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
               type: 'log',
-              content: chunk.toString()
+              content: chunk.toString(),
+              autoClear: false  // Regular log messages don't auto-clear
             }));
           }
         });
@@ -474,10 +482,16 @@ app.post('/api/data-collection/test-connection', async (req, res) => {
     const ssh = await createSSHConnection(req.body);
     await ssh.execCommand('echo "Connection successful"');
     ssh.dispose();
-    res.json({ message: 'Connection successful' });
+    res.json({ 
+      message: 'Connection successful',
+      autoClear: true  // Add flag to indicate this message should auto-clear
+    });
   } catch (error) {
     console.error('SSH Test Error:', error);
-    res.status(500).json({ error: 'Failed to connect to the data collection machine' });
+    res.status(500).json({ 
+      error: 'Failed to connect to the data collection machine',
+      autoClear: true  // Add flag to indicate this message should auto-clear
+    });
   }
 });
 
@@ -1125,17 +1139,7 @@ app.post('/api/data-collection/stop', async (req, res) => {
     if (pid) {
       // Stop specific process by PID
       try {
-        await ssh.execCommand(`kill ${pid}`);
-        // Verify the process was stopped
-        const checkResult = await ssh.execCommand(`ps -p ${pid} | grep -v TTY`);
-        if (checkResult.stdout.trim().length === 0) {
-          // Process was successfully stopped
-          removeDataCollectionInstance(sshHost);
-        } else {
-          // Process is still running, try force kill
-          await ssh.execCommand(`kill -9 ${pid}`);
-          removeDataCollectionInstance(sshHost);
-        }
+        await ssh.execCommand(`kill -9 ${pid}`);
       } catch (error) {
         console.error('Error stopping process:', error);
         // Even if there's an error, remove from tracking
@@ -1144,6 +1148,15 @@ app.post('/api/data-collection/stop', async (req, res) => {
     } else {
       // Kill all data collection processes
       try {
+        // First try to kill by PID if provided
+        if (pid) {
+          await ssh.execCommand(`kill -9 ${pid}`);
+        }
+        
+        // Then kill any remaining collect_features.py processes
+        await ssh.execCommand('pkill -9 -f collect_features.py');
+        
+        // Also kill any Python processes that might be running the script
         await ssh.execCommand('pkill -f collect_features.py');
         // Clear all running instances for this machine
         removeDataCollectionInstance(sshHost);

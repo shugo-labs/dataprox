@@ -15,18 +15,19 @@ import TrafficGenerator from './components/TrafficGenerator';
 import DataCollection from './components/DataCollection';
 import logo from './assets/shugo-logo.png'; // Make sure to add your logo to src/assets/
 
+
 const theme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#03FFF6', // shugo.io bright purple
+      main: '#03FFF6',
     },
     secondary: {
-      main: '#7871a0', // shugo.io bright purple
+      main: '#00FF9D',
     },
     background: {
-      default: '#1B1B3A',  // dark blue-purple background
-      paper: '#29294D',    // slightly lighter paper
+      default: '#1B1B3A',
+      paper: '#2A2A4A',
     },
     text: {
       primary: '#E6E6FA',  // light lavender-ish white text
@@ -52,6 +53,49 @@ const theme = createTheme({
       styleOverrides: {
         body: {
           backgroundColor: '#1B1B3A',
+          color: '#E6E6FA',
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+        },
+        containedPrimary: {
+          background: 'linear-gradient(45deg, #00FF9D 0%, #00FF9D 40%, #03FFF6 60%, #00B8FF 100%)',
+          color: '#1B1B3A',
+          fontWeight: 600,
+          border: 'none',
+          '&:hover': {
+            background: 'linear-gradient(45deg, #00FF9D 0%, #00FF9D 40%, #03FFF6 60%, #00B8FF 100%)',
+            opacity: 0.9,
+            border: 'none'
+          },
+          '&.Mui-disabled': {
+            background: 'none',
+            backgroundColor: 'rgba(255, 255, 255, 0.12)',
+            border: 'none'
+          }
+        },
+        outlinedPrimary: {
+          borderColor: '#03FFF6',
+          color: '#03FFF6',
+          '&:hover': {
+            borderColor: '#03FFF6',
+            backgroundColor: 'rgba(3, 255, 246, 0.1)'
+          },
+          '&.Mui-disabled': {
+            borderColor: 'rgba(255, 255, 255, 0.12)',
+            color: 'rgba(255, 255, 255, 0.12)'
+          }
+        }
+      }
+    },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#2A2A4A',
           color: '#E6E6FA',
         },
       },

@@ -39,6 +39,7 @@ interface RunningInstance {
   startTime: string;
   status: string;
   machineIp: string;
+  moatPublicIp: string;
   instanceKey: string;
 }
 
@@ -52,6 +53,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
     // Traffic Generator Configuration
     interface: '',
     moatPrivateIp: '',
+    moatPublicIp: '',
     privateIp: '',
     nodeIndex: '',
     totalDuration: '',
@@ -340,6 +342,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         sshKeyPath: '',
         interface: '',
         moatPrivateIp: '',
+        moatPublicIp: '',
         privateIp: '',
         nodeIndex: '',
         totalDuration: '',
@@ -374,6 +377,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
                 <TableCell>PID</TableCell>
                 <TableCell>Start Time</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Receiver IP</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -386,6 +390,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
                     <TableCell>{instance.pid}</TableCell>
                     <TableCell>{new Date(instance.startTime).toLocaleString()}</TableCell>
                     <TableCell>{instance.status}</TableCell>
+                    <TableCell>{instance.moatPublicIp}</TableCell>
                     <TableCell>
                       <Button
                         variant="contained"
@@ -401,7 +406,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     No running instances
                   </TableCell>
                 </TableRow>
@@ -527,6 +532,17 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
+            label="Moat Public IP"
+            name="moatPublicIp"
+            value={formData.moatPublicIp}
+            onChange={handleInputChange}
+            required
+            helperText="Public IP of the receiver machine"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
             label="Private IP"
             name="privateIp"
             value={formData.privateIp}
@@ -568,6 +584,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
             !formData.sshUsername || 
             !formData.interface || 
             !formData.moatPrivateIp || 
+            !formData.moatPublicIp || 
             !formData.privateIp || 
             !formData.nodeIndex || 
             !formData.totalDuration

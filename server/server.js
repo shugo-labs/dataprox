@@ -34,8 +34,18 @@ async function loadRunningInstances() {
       
       // Verify each instance's process
       for (const instance of data) {
-        const isRunning = await verifyProcess(instance.sshConfig, instance.pid);
+        // Create SSH config from instance data
+        const sshConfig = {
+          sshHost: instance.machineIp,
+          sshUsername: instance.sshUsername,
+          sshPassword: instance.sshPassword,
+          sshKeyPath: instance.sshKeyPath
+        };
+
+        const isRunning = await verifyProcess(sshConfig, instance.pid);
         if (isRunning) {
+          // Ensure SSH config is included in the instance data
+          instance.sshConfig = sshConfig;
           runningInstances.set(instance.instanceKey, instance);
         } else {
           console.log(`Instance ${instance.instanceKey} is no longer running`);
@@ -62,27 +72,22 @@ function saveRunningInstances() {
 }
 
 // Function to add a running instance
-function addRunningInstance(nodeIndex, pid, sshConfig) {
-  const machineKey = sshConfig.sshHost; // Key for machine
-  const instanceKey = `${sshConfig.sshHost}_${nodeIndex}`; // Key for instance
-
-  // Check if machine already has an instance
-  for (const [key, instance] of runningInstances.entries()) {
-    if (instance.machineIp === sshConfig.sshHost) {
-      throw new Error(`Machine ${sshConfig.sshHost} already has a running instance`);
-    }
-  }
-
+function addRunningInstance(nodeIndex, pid, sshConfig, moatPublicIp) {
+  const instanceKey = `${sshConfig.sshHost}-${nodeIndex}`;
   const instance = {
-    pid,
-    startTime: new Date(),
-    sshConfig,
+    nodeIndex: parseInt(nodeIndex),
+    pid: pid,
+    startTime: new Date().toISOString(),
     status: 'running',
-    nodeIndex,
     machineIp: sshConfig.sshHost,
-    instanceKey
+    moatPublicIp: moatPublicIp,
+    instanceKey: instanceKey,
+    // Store SSH config for verification
+    sshConfig: sshConfig,
+    sshUsername: sshConfig.sshUsername,
+    sshPassword: sshConfig.sshPassword,
+    sshKeyPath: sshConfig.sshKeyPath
   };
-
   runningInstances.set(instanceKey, instance);
   saveRunningInstances();
   return instance;
@@ -499,7 +504,7 @@ app.post('/api/data-collection/test-connection', async (req, res) => {
 app.post('/api/traffic-generator/run', async (req, res) => {
   let ssh = null;
   try {
-    const { interface, moatPrivateIp, privateIp, nodeIndex, totalDuration, ...sshConfig } = req.body;
+    const { interface, moatPrivateIp, moatPublicIp, privateIp, nodeIndex, totalDuration, ...sshConfig } = req.body;
     
     // Check if this node index is already running on any machine
     if (isNodeIndexRunning(nodeIndex)) {
@@ -520,6 +525,7 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     console.log('Starting traffic generation with config:', {
       interface,
       moatPrivateIp,
+      moatPublicIp,
       privateIp,
       nodeIndex,
       totalDuration,
@@ -537,7 +543,7 @@ app.post('/api/traffic-generator/run', async (req, res) => {
 
     if (checkDir.code !== 0) {
       console.log('Cloning TrafficGenerator repository...');
-      const cloneResult = await ssh.execCommand('git clone https://github.com/shugo-labs/dataprox/TrafficGenerator.git', {
+      const cloneResult = await ssh.execCommand('git clone https://github.com/borgg-dev/dataprox.git', {
         cwd: '~/dataprox'
       });
       console.log('Clone result:', cloneResult.stdout, cloneResult.stderr);
@@ -550,7 +556,6 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     // Create a unique log file name
     const timestamp = new Date().getTime();
     const logFileName = `traffic_${timestamp}.log`;
-    const logFilePath = path.join(logsDir, logFileName);
     const remoteLogFile = `/tmp/${logFileName}`;
     
     // Create empty log file first
@@ -565,7 +570,7 @@ app.post('/api/traffic-generator/run', async (req, res) => {
         const content = chunk.toString();
         console.log('STDOUT:', content);
         // Write to local log file
-        fs.appendFileSync(logFilePath, content);
+        fs.appendFileSync(path.join(logsDir, logFileName), content);
         // Broadcast to all WebSocket clients
         wss.clients.forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
@@ -581,7 +586,7 @@ app.post('/api/traffic-generator/run', async (req, res) => {
         const content = chunk.toString();
         console.error('STDERR:', content);
         // Write to local log file
-        fs.appendFileSync(logFilePath, content);
+        fs.appendFileSync(path.join(logsDir, logFileName), content);
         // Broadcast to all WebSocket clients
         wss.clients.forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
@@ -602,8 +607,8 @@ app.post('/api/traffic-generator/run', async (req, res) => {
       pidfile="/tmp/traffic_${timestamp}.pid"
       logfile="${remoteLogFile}"
 
-      # Start the traffic generator with nohup and in background
-      nohup bash run_traffic.sh ${interface} ${moatPrivateIp} ${privateIp} ${nodeIndex} ${totalDuration} > "$logfile" 2>&1 &
+      # Start the traffic generator in background but keep it in the same process group
+      bash run_traffic.sh ${interface} ${moatPrivateIp} ${privateIp} ${nodeIndex} ${totalDuration} > "$logfile" 2>&1 &
       echo $! > "$pidfile"
     '`;
 
@@ -617,7 +622,7 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     console.log('Process PID:', pid);
 
     // Add to running instances
-    const instance = addRunningInstance(nodeIndex, pid, sshConfig);
+    const instance = addRunningInstance(nodeIndex, pid, sshConfig, moatPublicIp);
 
     // Check if the process is running
     console.log('Checking if process is running...');

@@ -192,12 +192,31 @@ function App() {
             }}
           >
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tabs 
-                value={tabValue} 
-                onChange={handleTabChange} 
-                aria-label="dashboard tabs"
-                textColor="primary"
-                indicatorColor="primary"
+              <Tabs
+                value={tabValue}
+                onChange={handleTabChange}
+                sx={{
+                  '& .MuiTabs-indicator': {
+                    background: 'linear-gradient(45deg, #00FF9D 0%, #00FF9D 40%, #03FFF6 60%, #00B8FF 100%)',
+                  },
+                  '& .MuiTab-root': {
+                    color: '#03FFF6',
+                    transition: 'all 0.3s ease',
+                    '&.Mui-selected': {
+                      background: 'linear-gradient(45deg, #00FF9D 0%, #00FF9D 40%, #03FFF6 60%, #00B8FF 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      fontWeight: 600,
+                      opacity: 1
+                    },
+                    '&:hover': {
+                      background: 'linear-gradient(45deg, #00FF9D 0%, #00FF9D 40%, #03FFF6 60%, #00B8FF 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      opacity: 0.8
+                    }
+                  }
+                }}
               >
                 <Tab label="Traffic Generator" />
                 <Tab label="Data Collection" />

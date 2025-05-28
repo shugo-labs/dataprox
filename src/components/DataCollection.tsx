@@ -28,6 +28,8 @@ interface RunningInstance {
   status: string;
   machineIp: string;
   instanceKey: string;
+  nodeIndex: number;
+  moatPublicIp: string;
 }
 
 const DataCollection: React.FC<DataCollectionProps> = () => {
@@ -44,6 +46,8 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
     mongodbDatabase: '',
     mongodbCollection: '',
     autoRestart: true,
+    nodeIndex: '',
+    moatPublicIp: '',
   });
   const [loading, setLoading] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -52,6 +56,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
   const [runningInstances, setRunningInstances] = useState<RunningInstance[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
   // Add effect for auto-clearing success messages
   useEffect(() => {
@@ -237,6 +242,16 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check if node index is already in use for the same receiver IP
+    const nodeIndexNum = parseInt(formData.nodeIndex);
+    if (runningInstances.some(instance => 
+      parseInt(instance.nodeIndex.toString()) === nodeIndexNum && 
+      instance.moatPublicIp === formData.moatPublicIp
+    )) {
+      setError(`Node index ${nodeIndexNum} is already in use for receiver IP ${formData.moatPublicIp}. Please choose a different node index.`);
+      return;
+    }
+
     // Check if this machine already has a running instance
     if (runningInstances.some(instance => instance.machineIp === formData.sshHost)) {
       setError(`Machine ${formData.sshHost} already has a running instance. Only one instance per machine is allowed.`);
@@ -268,6 +283,8 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         mongodbDatabase: '',
         mongodbCollection: '',
         autoRestart: true,
+        nodeIndex: '',
+        moatPublicIp: '',
       });
     } catch (err: any) {
       setError(err.response?.data?.details || 'Failed to start data collection. Please try again.');
@@ -544,6 +561,31 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
           {stopping ? <CircularProgress size={24} /> : 'Stop All'}
         </Button>
       </Box>
+
+      <Button
+        variant={autoRefresh ? 'contained' : 'outlined'}
+        onClick={() => setAutoRefresh(!autoRefresh)}
+        sx={{ 
+          ml: 1,
+          ...(autoRefresh ? {
+            backgroundColor: '#03FFF6',
+            color: '#1B1B3A',
+            '&:hover': {
+              backgroundColor: '#03FFF6',
+              opacity: 0.9
+            }
+          } : {
+            borderColor: '#03FFF6',
+            color: '#03FFF6',
+            '&:hover': {
+              borderColor: '#03FFF6',
+              backgroundColor: 'rgba(3, 255, 246, 0.1)'
+            }
+          })
+        }}
+      >
+        Auto Refresh
+      </Button>
     </Box>
   );
 };

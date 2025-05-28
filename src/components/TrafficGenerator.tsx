@@ -308,10 +308,13 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if node index is already in use on any machine
+    // Check if node index is already in use for the same receiver IP
     const nodeIndexNum = parseInt(formData.nodeIndex);
-    if (runningInstances.some(instance => instance.nodeIndex === nodeIndexNum)) {
-      setError(`Node index ${nodeIndexNum} is already in use on another machine. Please choose a different node index.`);
+    if (runningInstances.some(instance => 
+      parseInt(instance.nodeIndex.toString()) === nodeIndexNum && 
+      instance.moatPublicIp === formData.moatPublicIp
+    )) {
+      setError(`Node index ${nodeIndexNum} is already in use for receiver IP ${formData.moatPublicIp}. Please choose a different node index.`);
       return;
     }
 
@@ -636,7 +639,24 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
           <Button
             variant={autoRefresh ? 'contained' : 'outlined'}
             onClick={() => setAutoRefresh(!autoRefresh)}
-            sx={{ ml: 1 }}
+            sx={{ 
+              ml: 1,
+              ...(autoRefresh ? {
+                backgroundColor: '#03FFF6',
+                color: '#1B1B3A',
+                '&:hover': {
+                  backgroundColor: '#03FFF6',
+                  opacity: 0.9
+                }
+              } : {
+                borderColor: '#03FFF6',
+                color: '#03FFF6',
+                '&:hover': {
+                  borderColor: '#03FFF6',
+                  backgroundColor: 'rgba(3, 255, 246, 0.1)'
+                }
+              })
+            }}
           >
             Auto Refresh
           </Button>

@@ -422,7 +422,19 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         color="primary"
         onClick={testConnection}
         disabled={loading || stopping}
-        sx={{ mt: 2 }}
+        sx={{ 
+          mt: 2,
+          borderColor: '#03FFF6',
+          color: '#03FFF6',
+          '&:hover': {
+            borderColor: '#03FFF6',
+            backgroundColor: 'rgba(3, 255, 246, 0.1)'
+          },
+          '&.Mui-disabled': {
+            borderColor: 'rgba(255, 255, 255, 0.12)',
+            color: 'rgba(255, 255, 255, 0.12)'
+          }
+        }}
       >
         Test Connection
       </Button>
@@ -514,16 +526,19 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
             runningInstances.some(instance => instance.machineIp === formData.sshHost)
           }
           sx={{
-            backgroundColor: '#03FFF6',
+            background: 'linear-gradient(45deg, #00FF9D 0%, #00FF9D 40%, #03FFF6 60%, #00B8FF 100%)',
             color: '#1B1B3A',
             fontWeight: 600,
+            border: 'none',
             '&:hover': {
-              backgroundColor: '#03FFF6',
+              background: 'linear-gradient(45deg, #00FF9D 0%, #00FF9D 40%, #03FFF6 60%, #00B8FF 100%)',
               opacity: 0.9,
+              border: 'none'
             },
             '&.Mui-disabled': {
               background: 'none',
               backgroundColor: 'rgba(255, 255, 255, 0.12)',
+              border: 'none'
             }
           }}
         >

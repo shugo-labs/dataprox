@@ -492,7 +492,19 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         color="primary"
         onClick={testConnection}
         disabled={loading || stopping}
-        sx={{ mt: 2 }}
+        sx={{ 
+          mt: 2,
+          borderColor: '#03FFF6',
+          color: '#03FFF6',
+          '&:hover': {
+            borderColor: '#03FFF6',
+            backgroundColor: 'rgba(3, 255, 246, 0.1)'
+          },
+          '&.Mui-disabled': {
+            borderColor: 'rgba(255, 255, 255, 0.12)',
+            color: 'rgba(255, 255, 255, 0.12)'
+          }
+        }}
       >
         Test Connection
       </Button>
@@ -506,7 +518,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label="Private Network Interface"
+            label="Interface"
             name="interface"
             value={formData.interface}
             onChange={handleInputChange}
@@ -516,7 +528,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label="MOAT Private IP"
+            label="Moat Private IP"
             name="moatPrivateIp"
             value={formData.moatPrivateIp}
             onChange={handleInputChange}
@@ -526,7 +538,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label="TGEN Private IP"
+            label="Private IP"
             name="privateIp"
             value={formData.privateIp}
             onChange={handleInputChange}
@@ -538,13 +550,10 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
             fullWidth
             label="Node Index"
             name="nodeIndex"
-            type="number"
             value={formData.nodeIndex}
             onChange={handleInputChange}
             required
-            error={runningInstances.some(instance => instance.nodeIndex === parseInt(formData.nodeIndex))}
-            helperText={runningInstances.some(instance => instance.nodeIndex === parseInt(formData.nodeIndex)) ? 
-              'This node index is already in use on another machine' : ''}
+            type="number"
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -552,15 +561,15 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
             fullWidth
             label="Total Duration (seconds)"
             name="totalDuration"
-            type="number"
             value={formData.totalDuration}
             onChange={handleInputChange}
             required
+            type="number"
           />
         </Grid>
       </Grid>
 
-      <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+      <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
         <Button
           type="submit"
           variant="contained"
@@ -572,21 +581,22 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
             !formData.moatPrivateIp || 
             !formData.privateIp || 
             !formData.nodeIndex || 
-            !formData.totalDuration ||
-            runningInstances.some(instance => instance.nodeIndex === parseInt(formData.nodeIndex)) ||
-            runningInstances.some(instance => instance.machineIp === formData.sshHost)
+            !formData.totalDuration
           }
           sx={{
-            backgroundColor: '#03FFF6',
+            background: 'linear-gradient(45deg, #00FF9D 0%, #00FF9D 40%, #03FFF6 60%, #00B8FF 100%)',
             color: '#1B1B3A',
             fontWeight: 600,
+            border: 'none',
             '&:hover': {
-              backgroundColor: '#03FFF6',
+              background: 'linear-gradient(45deg, #00FF9D 0%, #00FF9D 40%, #03FFF6 60%, #00B8FF 100%)',
               opacity: 0.9,
+              border: 'none'
             },
             '&.Mui-disabled': {
               background: 'none',
               backgroundColor: 'rgba(255, 255, 255, 0.12)',
+              border: 'none'
             }
           }}
         >
@@ -597,11 +607,11 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
           color="error"
           fullWidth
           onClick={handleStop}
-          disabled={loading || stopping || !formData.sshHost}
+          disabled={stopping || runningInstances.length === 0}
         >
-          {stopping ? <CircularProgress size={24} /> : 'Stop All Traffic'}
+          {stopping ? <CircularProgress size={24} /> : 'Stop All'}
         </Button>
-      </Stack>
+      </Box>
 
       <Divider sx={{ my: 4 }} />
 

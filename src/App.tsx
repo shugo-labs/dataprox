@@ -102,14 +102,14 @@ function App() {
           borderColor: 'divider'
         }}>
           <Toolbar sx={{ justifyContent: 'center', position: 'relative' }}>
-            <Typography
-              variant="h4"
+            <Typography 
+              variant="h4" 
               component="div"
-              sx={{
+              sx={{ 
                 fontFamily: `'Inter', 'Poppins', 'Roboto', 'Helvetica Neue', Arial, sans-serif`,
                 fontWeight: 700,
                 letterSpacing: '0.05em',
-                background: 'linear-gradient(45deg, #03FFF6 30%, #7871a0 90%)',
+                background: 'linear-gradient(45deg, #00FF9D 0%, #00FF9D 40%, #03FFF6 60%, #00B8FF 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 textShadow: '0 2px 4px rgba(0,0,0,0.1)',

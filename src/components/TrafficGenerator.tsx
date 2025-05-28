@@ -113,6 +113,26 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Add effect for auto-clearing success messages
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        setSuccess(null);
+      }, 5000); // Clear after 5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
+
+  // Add effect for auto-clearing connection status
+  useEffect(() => {
+    if (connectionStatus) {
+      const timer = setTimeout(() => {
+        setConnectionStatus(null);
+      }, 5000); // Clear after 5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [connectionStatus]);
+
   const fetchLogFiles = async () => {
     try {
       const response = await axios.get('/api/logs');
@@ -339,25 +359,38 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       </Typography>
 
       {/* Running Instances Section */}
-      {runningInstances.length > 0 && (
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Running Instances
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6">
+            Running Instances ({runningInstances.length})
           </Typography>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Machine IP</TableCell>
-                  <TableCell>Node Index</TableCell>
-                  <TableCell>PID</TableCell>
-                  <TableCell>Start Time</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {runningInstances.map((instance) => (
+          {runningInstances.length > 0 && (
+            <Button
+              variant="contained"
+              color="error"
+              onClick={handleStop}
+              disabled={stopping}
+              startIcon={stopping ? <CircularProgress size={20} /> : null}
+            >
+              Stop All Instances
+            </Button>
+          )}
+        </Box>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Machine IP</TableCell>
+                <TableCell>Node Index</TableCell>
+                <TableCell>PID</TableCell>
+                <TableCell>Start Time</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {runningInstances.length > 0 ? (
+                runningInstances.map((instance) => (
                   <TableRow key={instance.instanceKey}>
                     <TableCell>{instance.machineIp}</TableCell>
                     <TableCell>{instance.nodeIndex}</TableCell>
@@ -376,12 +409,18 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      )}
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">
+                    No running instances
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>

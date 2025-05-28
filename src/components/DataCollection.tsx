@@ -53,6 +53,16 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
   const [runningInstances, setRunningInstances] = useState<RunningInstance[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Add effect for auto-clearing success messages
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        setSuccess(null);
+      }, 5000); // Clear after 5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
+
   // Add effect for fetching and verifying running instances
   useEffect(() => {
     fetchRunningInstances();
@@ -273,20 +283,13 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         </Button>
       </Box>
 
-      {/* Debug info */}
-      <Box sx={{ mb: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-        <Typography variant="body2" color="text.secondary">
-          Number of running instances: {runningInstances.length}
-        </Typography>
-      </Box>
-
       {/* Running Instances Section */}
-      {runningInstances && runningInstances.length > 0 && (
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">
-              Running Instances ({runningInstances.length})
-            </Typography>
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6">
+            Running Instances ({runningInstances.length})
+          </Typography>
+          {runningInstances.length > 0 && (
             <Button
               variant="contained"
               color="error"
@@ -296,20 +299,22 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
             >
               Stop All Instances
             </Button>
-          </Box>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Machine IP</TableCell>
-                  <TableCell>PID</TableCell>
-                  <TableCell>Start Time</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {runningInstances.map((instance) => (
+          )}
+        </Box>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Machine IP</TableCell>
+                <TableCell>PID</TableCell>
+                <TableCell>Start Time</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {runningInstances.length > 0 ? (
+                runningInstances.map((instance) => (
                   <TableRow key={instance.instanceKey}>
                     <TableCell>{instance.machineIp}</TableCell>
                     <TableCell>{instance.pid}</TableCell>
@@ -340,12 +345,18 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
                       </Box>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      )}
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} align="center">
+                    No running instances
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>

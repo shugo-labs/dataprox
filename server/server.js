@@ -850,31 +850,66 @@ app.post('/api/data-collection/run', async (req, res) => {
 
     // Install required packages in smaller steps
     const installSteps = [
+      // Step 0: Check and remove apt locks
+      `sudo rm /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock*`,
+      
       // Step 1: Update system
-      `cd ~/dataprox && sudo apt update && sudo apt upgrade -y`,
+      `sudo apt update && sudo apt upgrade -y`,
       
       // Step 2: Install system packages
-      `cd ~/dataprox && sudo apt install -y tcpdump tshark sysstat ifstat dstat vnstat snmpd python3-pip`,
+      `sudo apt install -y tcpdump tshark sysstat ifstat dstat vnstat snmpd python3-pip`,
       
-      // Step 3: Install npm and pm2
-      `cd ~/dataprox && sudo apt install -y npm && sudo npm install -g pm2`,
+      // Step 5: Install Python packages
+      `pip3 install scapy pandas numpy psutil websockets asyncio pymongo python-dotenv`,
       
-      // Step 4: Install Python packages
-      `cd ~/dataprox && pip3 install scapy pandas numpy psutil websockets asyncio pymongo python-dotenv`,
-      
-      // Step 5: Start services
-      `cd ~/dataprox && sudo systemctl enable --now sysstat && sudo systemctl enable --now snmpd`
+      // Step 6: Start services
+      `sudo systemctl enable --now sysstat && sudo systemctl enable --now snmpd`
     ];
 
     console.log('Installing required packages...');
     for (const step of installSteps) {
       try {
         console.log(`Executing step: ${step}`);
-        const result = await ssh.execCommand(step);
-        if (result.code !== 0) {
-          console.warn(`Warning: Step completed with non-zero exit code: ${result.stderr || result.stdout}`);
+        // Add retry logic for apt commands
+        let retries = 3;
+        let lastError = null;
+        
+        while (retries > 0) {
+          try {
+            const result = await ssh.execCommand(step);
+            console.log(`Command output: ${result.stdout}`);
+            if (result.stderr) {
+              console.log(`Command errors: ${result.stderr}`);
+            }
+            
+            if (result.code !== 0) {
+              console.warn(`Warning: Step completed with non-zero exit code: ${result.stderr || result.stdout}`);
+              if (result.stderr && result.stderr.includes('Could not get lock')) {
+                // If it's a lock error, wait and retry
+                console.log('Lock error detected, waiting 5 seconds before retry...');
+                await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+                retries--;
+                continue;
+              }
+            }
+            console.log(`Step completed successfully: ${result.stdout}`);
+            break; // Success, exit retry loop
+          } catch (error) {
+            lastError = error;
+            console.error(`Attempt failed: ${error.message}`);
+            if (error.message && error.message.includes('Could not get lock')) {
+              console.log('Lock error detected, waiting 5 seconds before retry...');
+              await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+              retries--;
+              continue;
+            }
+            throw error; // If it's not a lock error, throw immediately
+          }
         }
-        console.log(`Step completed: ${result.stdout}`);
+        
+        if (retries === 0 && lastError) {
+          throw lastError;
+        }
       } catch (error) {
         console.error(`Error executing step: ${error.message}`);
         // Continue with next step even if this one fails

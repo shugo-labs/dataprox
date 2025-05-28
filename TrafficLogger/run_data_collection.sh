@@ -12,7 +12,5 @@ pip3 install scapy pandas numpy psutil websockets asyncio pymongo python-dotenv
 systemctl enable --now sysstat
 systemctl enable --now snmpd
 
-pm2 kill && pm2 flush
-
 # Start the data capture script in the background
 pm2 start "python3 collect_features.py" --name collect_features

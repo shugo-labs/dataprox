@@ -9,7 +9,9 @@ const http = require('http');
 
 // Traffic Generator instance tracking
 const INSTANCES_FILE = path.join(__dirname, 'running_instances.json');
+const DATA_COLLECTION_INSTANCES_FILE = path.join(__dirname, 'running_data_collection.json');
 const runningInstances = new Map(); // Map to store running instances
+const runningDataCollection = new Map(); // Map to store running data collection instances
 
 // Function to verify if a process is still running
 async function verifyProcess(sshConfig, pid) {
@@ -118,6 +120,136 @@ function isMachineRunning(sshHost) {
   return false;
 }
 
+// Function to verify all running instances
+async function verifyAllInstances() {
+  const instancesToRemove = [];
+  
+  for (const [key, instance] of runningInstances.entries()) {
+    try {
+      const isRunning = await verifyProcess(instance.sshConfig, instance.pid);
+      if (!isRunning) {
+        instancesToRemove.push(key);
+      }
+    } catch (error) {
+      console.error(`Error verifying instance ${key}:`, error);
+      instancesToRemove.push(key);
+    }
+  }
+
+  // Remove stopped instances
+  for (const key of instancesToRemove) {
+    runningInstances.delete(key);
+  }
+
+  if (instancesToRemove.length > 0) {
+    saveRunningInstances();
+  }
+
+  return instancesToRemove.length > 0;
+}
+
+// Load running data collection instances from file if it exists
+async function loadDataCollectionInstances() {
+  try {
+    if (fs.existsSync(DATA_COLLECTION_INSTANCES_FILE)) {
+      const data = JSON.parse(fs.readFileSync(DATA_COLLECTION_INSTANCES_FILE, 'utf8'));
+      
+      // Verify each instance's process
+      for (const instance of data) {
+        const isRunning = await verifyProcess(instance.sshConfig, instance.pid);
+        if (isRunning) {
+          runningDataCollection.set(instance.instanceKey, instance);
+        } else {
+          console.log(`Data Collection instance ${instance.instanceKey} is no longer running`);
+        }
+      }
+      
+      // Save the verified instances back to file
+      saveDataCollectionInstances();
+      console.log('Loaded running data collection instances:', Array.from(runningDataCollection.values()));
+    }
+  } catch (error) {
+    console.error('Error loading running data collection instances:', error);
+  }
+}
+
+// Save running data collection instances to file
+function saveDataCollectionInstances() {
+  try {
+    const instances = Array.from(runningDataCollection.values());
+    fs.writeFileSync(DATA_COLLECTION_INSTANCES_FILE, JSON.stringify(instances, null, 2));
+  } catch (error) {
+    console.error('Error saving running data collection instances:', error);
+  }
+}
+
+// Function to add a running data collection instance
+function addDataCollectionInstance(pid, sshConfig) {
+  const instanceKey = sshConfig.sshHost; // Key for instance (one per machine)
+
+  // Check if machine already has an instance
+  if (runningDataCollection.has(instanceKey)) {
+    throw new Error(`Machine ${sshConfig.sshHost} already has a running data collection instance`);
+  }
+
+  const instance = {
+    pid,
+    startTime: new Date(),
+    sshConfig,
+    status: 'running',
+    machineIp: sshConfig.sshHost,
+    instanceKey
+  };
+
+  runningDataCollection.set(instanceKey, instance);
+  saveDataCollectionInstances();
+  return instance;
+}
+
+// Function to remove a running data collection instance
+function removeDataCollectionInstance(sshHost) {
+  runningDataCollection.delete(sshHost);
+  saveDataCollectionInstances();
+}
+
+// Function to get all running data collection instances
+function getDataCollectionInstances() {
+  return Array.from(runningDataCollection.values());
+}
+
+// Function to check if a machine already has a running data collection instance
+function isDataCollectionRunning(sshHost) {
+  return runningDataCollection.has(sshHost);
+}
+
+// Function to verify all running data collection instances
+async function verifyAllDataCollectionInstances() {
+  const instancesToRemove = [];
+  
+  for (const [key, instance] of runningDataCollection.entries()) {
+    try {
+      const isRunning = await verifyProcess(instance.sshConfig, instance.pid);
+      if (!isRunning) {
+        instancesToRemove.push(key);
+      }
+    } catch (error) {
+      console.error(`Error verifying data collection instance ${key}:`, error);
+      instancesToRemove.push(key);
+    }
+  }
+
+  // Remove stopped instances
+  for (const key of instancesToRemove) {
+    runningDataCollection.delete(key);
+  }
+
+  if (instancesToRemove.length > 0) {
+    saveDataCollectionInstances();
+  }
+
+  return instancesToRemove.length > 0;
+}
+
 const app = express();
 const port = process.env.PORT || 3001; // Use environment variable PORT or default to 3002
 
@@ -200,8 +332,9 @@ async function createSSHConnection(sshConfig) {
     const config = {
       host: sshConfig.sshHost,
       username: sshConfig.sshUsername,
-      readyTimeout: 30000,
+      readyTimeout: 60000, // Increase timeout to 60 seconds
       keepaliveInterval: 10000,
+      keepaliveCountMax: 10,
       debug: true,
       tryKeyboard: true
     };
@@ -672,8 +805,364 @@ app.delete('/api/traffic-generator/logs/:filename', (req, res) => {
   }
 });
 
+// Add verification endpoint
+app.get('/api/traffic-generator/verify-instances', async (req, res) => {
+  try {
+    const hasChanges = await verifyAllInstances();
+    const instances = getRunningInstances();
+    res.json({ 
+      instances,
+      hasChanges
+    });
+  } catch (error) {
+    console.error('Error verifying instances:', error);
+    res.status(500).json({ 
+      error: 'Failed to verify instances',
+      details: error.message
+    });
+  }
+});
+
+// Data Collection endpoint
+app.post('/api/data-collection/run', async (req, res) => {
+  let ssh = null;
+  try {
+    const { mongodbUsername, mongodbPassword, mongodbHost, mongodbDatabase, mongodbCollection, autoRestart, ...sshConfig } = req.body;
+    
+    // Check if this machine already has a running instance
+    if (isDataCollectionRunning(sshConfig.sshHost)) {
+      return res.status(400).json({
+        error: 'Machine already has a running data collection instance',
+        details: `Machine ${sshConfig.sshHost} already has a data collection instance running`
+      });
+    }
+
+    ssh = await createSSHConnection(sshConfig);
+    
+    // Create a unique log file name
+    const timestamp = new Date().getTime();
+    const logFileName = `data_collection_${timestamp}.log`;
+    const logFilePath = path.join(logsDir, logFileName);
+    const remoteLogFile = `/tmp/${logFileName}`;
+    
+    // Create empty log file first
+    await ssh.execCommand(`touch ${remoteLogFile}`);
+
+    // Install required packages in smaller steps
+    const installSteps = [
+      // Step 1: Update system
+      `cd ~/dataprox && sudo apt update && sudo apt upgrade -y`,
+      
+      // Step 2: Install system packages
+      `cd ~/dataprox && sudo apt install -y tcpdump tshark sysstat ifstat dstat vnstat snmpd python3-pip`,
+      
+      // Step 3: Install npm and pm2
+      `cd ~/dataprox && sudo apt install -y npm && sudo npm install -g pm2`,
+      
+      // Step 4: Install Python packages
+      `cd ~/dataprox && pip3 install scapy pandas numpy psutil websockets asyncio pymongo python-dotenv`,
+      
+      // Step 5: Start services
+      `cd ~/dataprox && sudo systemctl enable --now sysstat && sudo systemctl enable --now snmpd`
+    ];
+
+    console.log('Installing required packages...');
+    for (const step of installSteps) {
+      try {
+        console.log(`Executing step: ${step}`);
+        const result = await ssh.execCommand(step);
+        if (result.code !== 0) {
+          console.warn(`Warning: Step completed with non-zero exit code: ${result.stderr || result.stdout}`);
+        }
+        console.log(`Step completed: ${result.stdout}`);
+      } catch (error) {
+        console.error(`Error executing step: ${error.message}`);
+        // Continue with next step even if this one fails
+      }
+    }
+
+    // Create/update .env file in the dataprox directory
+    const envCommand = `cd ~/dataprox && bash -c '
+      # Create/update .env file with the form data
+      cat > .env << EOL
+# MongoDB Configuration
+MONGODB_USERNAME=${mongodbUsername || ''}
+MONGODB_PASSWORD=${mongodbPassword || ''}
+MONGODB_HOST=${mongodbHost}
+MONGODB_DATABASE=${mongodbDatabase}
+MONGODB_COLLECTION=${mongodbCollection}
+AUTO_RESTART=${autoRestart}
+
+# Connection string will be constructed in the script based on these values
+EOL
+
+      # Display .env file contents for verification
+      echo "Created .env file with contents:"
+      cat .env
+    '`;
+
+    console.log('Creating .env file...');
+    const envResult = await ssh.execCommand(envCommand);
+    console.log('ENV file creation result:', envResult);
+
+    // First, test MongoDB connection with more detailed error handling
+    const mongoTestCommand = `python3 -c "
+import sys
+from pymongo import MongoClient
+try:
+    print('Attempting to connect to MongoDB...')
+    
+    # Get environment variables
+    mongodb_host = '${mongodbHost}'
+    mongodb_database = '${mongodbDatabase}'
+    mongodb_username = '${mongodbUsername}'
+    mongodb_password = '${mongodbPassword}'
+    
+    # Construct connection string based on provided credentials
+    if mongodb_username and mongodb_password:
+        # With authentication
+        conn_str = f'mongodb://{mongodb_username}:{mongodb_password}@{mongodb_host}/{mongodb_database}'
+    else:
+        # Without authentication
+        conn_str = f'mongodb://{mongodb_host}/{mongodb_database}'
+    
+    print(f'Connection string: {conn_str}')
+    
+    # Try connection with a timeout
+    client = MongoClient(conn_str, serverSelectionTimeoutMS=5000)
+    
+    # Force a connection to verify it works
+    client.server_info()
+    print('MongoDB connection successful')
+    
+    # Test database access
+    db = client[mongodb_database]
+    collections = db.list_collection_names()
+    print(f'Available collections: {collections}')
+    
+    # Test collection access
+    collection = db['${mongodbCollection}']
+    count = collection.count_documents({})
+    print(f'Number of documents in collection: {count}')
+    
+    sys.exit(0)
+except Exception as e:
+    print(f'MongoDB connection failed with error: {str(e)}')
+    print(f'Error type: {type(e).__name__}')
+    sys.exit(1)
+"`;
+
+    console.log('Testing MongoDB connection...');
+    const mongoTestResult = await ssh.execCommand(mongoTestCommand);
+    console.log('MongoDB test result:', mongoTestResult);
+    
+    if (mongoTestResult.code !== 0) {
+      throw new Error(`MongoDB connection test failed: ${mongoTestResult.stderr || mongoTestResult.stdout}`);
+    }
+
+    // Run the data collection script with error handling
+    const command = `cd ~/dataprox/TrafficLogger && bash -c '
+      timestamp=$(date +%s)
+      pidfile="/tmp/data_collection_${timestamp}.pid"
+      logfile="${remoteLogFile}"
+
+      # Log the parameters being passed
+      echo "Starting data collection with parameters:" > "$logfile"
+      echo "MongoDB Username: ${mongodbUsername}" >> "$logfile"
+      echo "MongoDB Host: ${mongodbHost}" >> "$logfile"
+      echo "MongoDB Database: ${mongodbDatabase}" >> "$logfile"
+      echo "MongoDB Collection: ${mongodbCollection}" >> "$logfile"
+      echo "Auto Restart: ${autoRestart}" >> "$logfile"
+      echo "----------------------------------------" >> "$logfile"
+
+      # Start the data collection with nohup and in background
+      nohup python3 collect_features.py > "$logfile" 2>&1 &
+      echo $! > "$pidfile"
+
+      # Wait a few seconds and check if the process is still running
+      sleep 5
+      if ! ps -p $(cat "$pidfile") > /dev/null; then
+        echo "Process failed to start. Check the log file for details."
+        exit 1
+      fi
+    '`;
+
+    const result = await ssh.execCommand(command);
+    
+    if (result.code !== 0) {
+      // Read the log file to get the error details
+      const logContent = await ssh.execCommand(`cat ${remoteLogFile}`);
+      throw new Error(`Failed to start data collection: ${logContent.stdout || logContent.stderr || result.stderr}`);
+    }
+    
+    // Get the PID
+    const pidResult = await ssh.execCommand(`cat /tmp/data_collection_${timestamp}.pid`);
+    const pid = pidResult.stdout.trim();
+
+    // Verify the process is running
+    const checkProcess = await ssh.execCommand(`ps -p ${pid} | grep -v TTY`);
+    if (checkProcess.stdout.trim().length === 0) {
+      // Read the log file to get the error details
+      const logContent = await ssh.execCommand(`cat ${remoteLogFile}`);
+      throw new Error(`Process failed to start: ${logContent.stdout || logContent.stderr}`);
+    }
+
+    // Add to running instances
+    const instance = addDataCollectionInstance(pid, sshConfig);
+
+    res.json({ 
+      message: 'Data collection started successfully',
+      details: {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        pid: pid,
+        logFile: `/api/logs/${logFileName}`,
+        instance: instance
+      }
+    });
+  } catch (error) {
+    console.error('Data Collection Error:', error);
+    if (ssh) {
+      ssh.dispose();
+    }
+    res.status(500).json({ 
+      error: 'Failed to start data collection',
+      details: error.message
+    });
+  }
+});
+
+// Get running data collection instances endpoint
+app.get('/api/data-collection/instances', (req, res) => {
+  try {
+    const instances = getDataCollectionInstances();
+    res.json({ instances });
+  } catch (error) {
+    console.error('Error getting running data collection instances:', error);
+    res.status(500).json({ error: 'Failed to get running data collection instances' });
+  }
+});
+
+// Stop data collection endpoint
+app.post('/api/data-collection/stop', async (req, res) => {
+  let ssh = null;
+  try {
+    const { pid, sshHost, sshUsername, sshPassword, sshKeyPath } = req.body;
+    
+    // Validate required SSH credentials
+    if (!sshHost || !sshUsername || (!sshPassword && !sshKeyPath)) {
+      return res.status(400).json({
+        error: 'Missing required SSH credentials',
+        details: 'SSH host, username, and either password or key path are required to stop processes'
+      });
+    }
+
+    const sshConfig = {
+      sshHost,
+      sshUsername,
+      sshPassword,
+      sshKeyPath
+    };
+
+    // Test SSH connection before proceeding
+    try {
+      ssh = await createSSHConnection(sshConfig);
+      console.log('SSH connection established for stop operation');
+    } catch (error) {
+      return res.status(401).json({
+        error: 'Failed to establish SSH connection',
+        details: 'Invalid SSH credentials or connection failed'
+      });
+    }
+
+    if (pid) {
+      const isRunning = await verifyProcess(sshConfig, pid);
+      if (!isRunning) {
+        // Process is not running, just remove from our tracking
+        removeDataCollectionInstance(sshHost);
+        return res.json({ 
+          message: 'Process was not running, removed from tracking',
+          stoppedPid: pid
+        });
+      }
+    }
+    
+    if (pid) {
+      // Stop specific process by PID
+      try {
+        await ssh.execCommand(`kill ${pid}`);
+        // Verify the process was stopped
+        const checkResult = await ssh.execCommand(`ps -p ${pid} | grep -v TTY`);
+        if (checkResult.stdout.trim().length === 0) {
+          // Process was successfully stopped
+          removeDataCollectionInstance(sshHost);
+        } else {
+          // Process is still running, try force kill
+          await ssh.execCommand(`kill -9 ${pid}`);
+          removeDataCollectionInstance(sshHost);
+        }
+      } catch (error) {
+        console.error('Error stopping process:', error);
+        // Even if there's an error, remove from tracking
+        removeDataCollectionInstance(sshHost);
+      }
+    } else {
+      // Kill all data collection processes
+      try {
+        await ssh.execCommand('pkill -f collect_features.py');
+        // Clear all running instances for this machine
+        removeDataCollectionInstance(sshHost);
+      } catch (error) {
+        console.error('Error stopping all processes:', error);
+        // Even if there's an error, remove from tracking
+        removeDataCollectionInstance(sshHost);
+      }
+    }
+    
+    ssh.dispose();
+    res.json({ 
+      message: 'Data collection stopped successfully',
+      stoppedPid: pid || 'all'
+    });
+  } catch (error) {
+    console.error('Stop Data Collection Error:', error);
+    if (ssh) {
+      ssh.dispose();
+    }
+    // Even if there's an error, try to remove from tracking
+    if (req.body.sshHost) {
+      removeDataCollectionInstance(req.body.sshHost);
+    }
+    res.status(500).json({ 
+      error: 'Failed to stop data collection',
+      details: error.message
+    });
+  }
+});
+
+// Add verification endpoint for data collection
+app.get('/api/data-collection/verify-instances', async (req, res) => {
+  try {
+    const hasChanges = await verifyAllDataCollectionInstances();
+    const instances = getDataCollectionInstances();
+    res.json({ 
+      instances,
+      hasChanges
+    });
+  } catch (error) {
+    console.error('Error verifying data collection instances:', error);
+    res.status(500).json({ 
+      error: 'Failed to verify data collection instances',
+      details: error.message
+    });
+  }
+});
+
 // Initialize server
-loadRunningInstances().then(() => {
+Promise.all([
+  loadRunningInstances(),
+  loadDataCollectionInstances()
+]).then(() => {
   server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
   });

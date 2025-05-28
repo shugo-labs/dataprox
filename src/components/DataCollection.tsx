@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -10,10 +10,25 @@ import {
   Switch,
   Grid,
   Divider,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import axios from 'axios';
 
 interface DataCollectionProps {}
+
+interface RunningInstance {
+  pid: string;
+  startTime: string;
+  status: string;
+  machineIp: string;
+  instanceKey: string;
+}
 
 const DataCollection: React.FC<DataCollectionProps> = () => {
   const [formData, setFormData] = useState({
@@ -31,9 +46,45 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
     autoRestart: true,
   });
   const [loading, setLoading] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
+  const [runningInstances, setRunningInstances] = useState<RunningInstance[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Add effect for fetching and verifying running instances
+  useEffect(() => {
+    fetchRunningInstances();
+    const interval = setInterval(fetchRunningInstances, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchRunningInstances = async () => {
+    try {
+      console.log('Fetching running instances...');
+      const response = await fetch('/api/data-collection/instances');
+      const data = await response.json();
+      console.log('Received instances data:', data);
+      if (data.instances) {
+        setRunningInstances(data.instances);
+      }
+    } catch (error) {
+      console.error('Error fetching running instances:', error);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchRunningInstances();
+      setSuccess('Running instances refreshed');
+    } catch (error) {
+      setError('Failed to refresh running instances');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -64,8 +115,114 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
     }
   };
 
+  const handleStopInstance = async (pid: string, machineIp: string) => {
+    // Check if we have the required SSH credentials
+    if (!formData.sshUsername || (!formData.sshPassword && !formData.sshKeyPath)) {
+      setError('SSH credentials are required to stop the instance. Please provide SSH username and either password or key path.');
+      return;
+    }
+
+    setStopping(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await axios.post('/api/data-collection/stop', {
+        pid,
+        sshHost: machineIp,
+        sshUsername: formData.sshUsername,
+        sshPassword: formData.sshPassword,
+        sshKeyPath: formData.sshKeyPath,
+      });
+
+      setSuccess('Data collection instance stopped successfully!');
+      
+      // Refresh running instances
+      const instancesResponse = await fetch('/api/data-collection/instances');
+      const instancesData = await instancesResponse.json();
+      setRunningInstances(instancesData.instances);
+    } catch (err: any) {
+      setError(err.response?.data?.details || 'Failed to stop data collection instance. Please try again.');
+      console.error('Error:', err);
+    } finally {
+      setStopping(false);
+    }
+  };
+
+  const handleStopAllInstances = async () => {
+    setStopping(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // Stop all instances on all machines
+      const stopPromises = runningInstances.map(instance => 
+        axios.post('/api/data-collection/stop', {
+          pid: instance.pid,
+          sshHost: instance.machineIp,
+          sshUsername: formData.sshUsername,
+          sshPassword: formData.sshPassword,
+          sshKeyPath: formData.sshKeyPath,
+        })
+      );
+
+      await Promise.all(stopPromises);
+      setSuccess('All data collection instances stopped successfully!');
+      
+      // Refresh running instances
+      const instancesResponse = await fetch('/api/data-collection/instances');
+      const instancesData = await instancesResponse.json();
+      setRunningInstances(instancesData.instances);
+    } catch (err: any) {
+      setError(err.response?.data?.details || 'Failed to stop all data collection instances. Please try again.');
+      console.error('Error:', err);
+    } finally {
+      setStopping(false);
+    }
+  };
+
+  const handleStopMachine = async (machineIp: string) => {
+    // Check if we have the required SSH credentials
+    if (!formData.sshUsername || (!formData.sshPassword && !formData.sshKeyPath)) {
+      setError('SSH credentials are required to stop the instance. Please provide SSH username and either password or key path.');
+      return;
+    }
+
+    setStopping(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await axios.post('/api/data-collection/stop', {
+        sshHost: machineIp,
+        sshUsername: formData.sshUsername,
+        sshPassword: formData.sshPassword,
+        sshKeyPath: formData.sshKeyPath,
+      });
+
+      setSuccess(`Data collection stopped successfully on ${machineIp}!`);
+      
+      // Refresh running instances
+      const instancesResponse = await fetch('/api/data-collection/instances');
+      const instancesData = await instancesResponse.json();
+      setRunningInstances(instancesData.instances);
+    } catch (err: any) {
+      setError(err.response?.data?.details || 'Failed to stop data collection. Please try again.');
+      console.error('Error:', err);
+    } finally {
+      setStopping(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if this machine already has a running instance
+    if (runningInstances.some(instance => instance.machineIp === formData.sshHost)) {
+      setError(`Machine ${formData.sshHost} already has a running instance. Only one instance per machine is allowed.`);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -73,8 +230,27 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
     try {
       const response = await axios.post('/api/data-collection/run', formData);
       setSuccess('Data collection started successfully!');
-    } catch (err) {
-      setError('Failed to start data collection. Please try again.');
+      
+      // Refresh running instances
+      const instancesResponse = await fetch('/api/data-collection/instances');
+      const instancesData = await instancesResponse.json();
+      setRunningInstances(instancesData.instances);
+      
+      // Reset form data after successful submission
+      setFormData({
+        sshHost: '',
+        sshUsername: '',
+        sshPassword: '',
+        sshKeyPath: '',
+        mongodbUsername: '',
+        mongodbPassword: '',
+        mongodbHost: '',
+        mongodbDatabase: '',
+        mongodbCollection: '',
+        autoRestart: true,
+      });
+    } catch (err: any) {
+      setError(err.response?.data?.details || 'Failed to start data collection. Please try again.');
       console.error('Error:', err);
     } finally {
       setLoading(false);
@@ -82,10 +258,94 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 800, mx: 'auto' }}>
-      <Typography variant="h5" gutterBottom>
-        Data Collection Configuration
-      </Typography>
+    <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 800, mx: 'auto', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h5">
+          Data Collection Configuration
+        </Typography>
+        <Button
+          variant="outlined"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          startIcon={refreshing ? <CircularProgress size={20} /> : null}
+        >
+          Refresh Instances
+        </Button>
+      </Box>
+
+      {/* Debug info */}
+      <Box sx={{ mb: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
+        <Typography variant="body2" color="text.secondary">
+          Number of running instances: {runningInstances.length}
+        </Typography>
+      </Box>
+
+      {/* Running Instances Section */}
+      {runningInstances && runningInstances.length > 0 && (
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">
+              Running Instances ({runningInstances.length})
+            </Typography>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={handleStopAllInstances}
+              disabled={stopping}
+              startIcon={stopping ? <CircularProgress size={20} /> : null}
+            >
+              Stop All Instances
+            </Button>
+          </Box>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Machine IP</TableCell>
+                  <TableCell>PID</TableCell>
+                  <TableCell>Start Time</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {runningInstances.map((instance) => (
+                  <TableRow key={instance.instanceKey}>
+                    <TableCell>{instance.machineIp}</TableCell>
+                    <TableCell>{instance.pid}</TableCell>
+                    <TableCell>{new Date(instance.startTime).toLocaleString()}</TableCell>
+                    <TableCell>{instance.status}</TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          variant="contained"
+                          color="error"
+                          size="small"
+                          onClick={() => handleStopInstance(instance.pid, instance.machineIp)}
+                          disabled={stopping}
+                          startIcon={stopping ? <CircularProgress size={16} /> : null}
+                        >
+                          Stop
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="error"
+                          size="small"
+                          onClick={() => handleStopMachine(instance.machineIp)}
+                          disabled={stopping}
+                          startIcon={stopping ? <CircularProgress size={16} /> : null}
+                        >
+                          Stop All on Machine
+                        </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -117,6 +377,9 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
             value={formData.sshHost}
             onChange={handleInputChange}
             required
+            error={runningInstances.some(instance => instance.machineIp === formData.sshHost)}
+            helperText={runningInstances.some(instance => instance.machineIp === formData.sshHost) ? 
+              'This machine already has a running instance' : ''}
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -137,7 +400,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
             type="password"
             value={formData.sshPassword}
             onChange={handleInputChange}
-            helperText="Password file if using pwd authentication"
+            helperText="Password if using pwd authentication"
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -156,7 +419,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         variant="outlined"
         color="primary"
         onClick={testConnection}
-        disabled={loading}
+        disabled={loading || stopping}
         sx={{ mt: 2 }}
       >
         Test Connection
@@ -175,7 +438,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
             name="mongodbUsername"
             value={formData.mongodbUsername}
             onChange={handleInputChange}
-            required
+            helperText="Optional - leave empty for local MongoDB without authentication"
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -186,7 +449,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
             type="password"
             value={formData.mongodbPassword}
             onChange={handleInputChange}
-            required
+            helperText="Optional - leave empty for local MongoDB without authentication"
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -197,6 +460,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
             value={formData.mongodbHost}
             onChange={handleInputChange}
             required
+            placeholder="localhost or 127.0.0.1 for local MongoDB"
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -234,16 +498,45 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         sx={{ mt: 2 }}
       />
 
-      <Button
-        type="submit"
-        variant="contained"
-        color="primary"
-        fullWidth
-        sx={{ mt: 3 }}
-        disabled={loading}
-      >
-        {loading ? <CircularProgress size={24} /> : 'Start Data Collection'}
-      </Button>
+      <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+        <Button
+          type="submit"
+          variant="contained"
+          fullWidth
+          disabled={loading || stopping || 
+            !formData.sshHost || 
+            !formData.sshUsername || 
+            !formData.mongodbHost || 
+            !formData.mongodbDatabase || 
+            !formData.mongodbCollection ||
+            runningInstances.some(instance => instance.machineIp === formData.sshHost)
+          }
+          sx={{
+            backgroundColor: '#03FFF6',
+            color: '#1B1B3A',
+            fontWeight: 600,
+            '&:hover': {
+              backgroundColor: '#03FFF6',
+              opacity: 0.9,
+            },
+            '&.Mui-disabled': {
+              background: 'none',
+              backgroundColor: 'rgba(255, 255, 255, 0.12)',
+            }
+          }}
+        >
+          {loading ? <CircularProgress size={24} /> : 'Start Data Collection'}
+        </Button>
+        <Button
+          variant="contained"
+          color="error"
+          fullWidth
+          onClick={handleStopAllInstances}
+          disabled={stopping || runningInstances.length === 0}
+        >
+          {stopping ? <CircularProgress size={24} /> : 'Stop All'}
+        </Button>
+      </Box>
     </Box>
   );
 };

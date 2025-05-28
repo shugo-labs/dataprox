@@ -88,13 +88,19 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
     };
   }, [autoRefresh, ws]);
 
-  // Add effect for fetching running instances
+  // Add effect for fetching and verifying running instances
   useEffect(() => {
     const fetchInstances = async () => {
       try {
-        const response = await fetch('/api/traffic-generator/instances');
+        const response = await fetch('/api/traffic-generator/verify-instances');
         const data = await response.json();
-        setRunningInstances(data.instances);
+        if (data.instances) {
+          setRunningInstances(data.instances);
+          // If instances were removed, show a message
+          if (data.hasChanges) {
+            setSuccess('Running instances updated');
+          }
+        }
       } catch (error) {
         console.error('Error fetching running instances:', error);
       }
@@ -519,7 +525,6 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         <Button
           type="submit"
           variant="contained"
-          color="primary"
           fullWidth
           disabled={loading || stopping || 
             !formData.sshHost || 
@@ -532,6 +537,19 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
             runningInstances.some(instance => instance.nodeIndex === parseInt(formData.nodeIndex)) ||
             runningInstances.some(instance => instance.machineIp === formData.sshHost)
           }
+          sx={{
+            backgroundColor: '#03FFF6',
+            color: '#1B1B3A',
+            fontWeight: 600,
+            '&:hover': {
+              backgroundColor: '#03FFF6',
+              opacity: 0.9,
+            },
+            '&.Mui-disabled': {
+              background: 'none',
+              backgroundColor: 'rgba(255, 255, 255, 0.12)',
+            }
+          }}
         >
           {loading ? <CircularProgress size={24} /> : 'Start Traffic Generation'}
         </Button>

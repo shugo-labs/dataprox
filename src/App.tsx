@@ -101,19 +101,25 @@ function App() {
           borderBottom: '1px solid',
           borderColor: 'divider'
         }}>
-          <Toolbar>
-          <Typography
-            variant="h6"
-            component="div"
-            sx={{
-              flexGrow: 1,
-              fontFamily: `'Inter', 'Poppins', 'Roboto', 'Helvetica Neue', Arial, sans-serif`,
-              fontWeight: 600,
-              letterSpacing: '0.02em',
-            }}
-          >
-            Δataprox by Shugo
-          </Typography>
+          <Toolbar sx={{ justifyContent: 'center', position: 'relative' }}>
+            <Typography
+              variant="h4"
+              component="div"
+              sx={{
+                fontFamily: `'Inter', 'Poppins', 'Roboto', 'Helvetica Neue', Arial, sans-serif`,
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                background: 'linear-gradient(45deg, #03FFF6 30%, #7871a0 90%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                position: 'absolute',
+                left: '50%',
+                transform: 'translateX(-50%)',
+              }}
+            >
+              Δataprox
+            </Typography>
 
             <Box
               component="img"
@@ -123,6 +129,8 @@ function App() {
                 height: 40,
                 width: 'auto',
                 cursor: 'pointer',
+                position: 'absolute',
+                right: 16,
                 '&:hover': {
                   opacity: 0.8,
                 },

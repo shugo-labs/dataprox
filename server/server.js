@@ -5,6 +5,119 @@ const cors = require('cors');
 const { NodeSSH } = require('node-ssh');
 const fs = require('fs');
 const WebSocket = require('ws');
+const http = require('http');
+
+// Traffic Generator instance tracking
+const INSTANCES_FILE = path.join(__dirname, 'running_instances.json');
+const runningInstances = new Map(); // Map to store running instances
+
+// Function to verify if a process is still running
+async function verifyProcess(sshConfig, pid) {
+  try {
+    const ssh = await createSSHConnection(sshConfig);
+    const result = await ssh.execCommand(`ps -p ${pid} | grep -v TTY`);
+    ssh.dispose();
+    return result.stdout.trim().length > 0;
+  } catch (error) {
+    console.error('Error verifying process:', error);
+    return false;
+  }
+}
+
+// Load running instances from file if it exists
+async function loadRunningInstances() {
+  try {
+    if (fs.existsSync(INSTANCES_FILE)) {
+      const data = JSON.parse(fs.readFileSync(INSTANCES_FILE, 'utf8'));
+      
+      // Verify each instance's process
+      for (const instance of data) {
+        const isRunning = await verifyProcess(instance.sshConfig, instance.pid);
+        if (isRunning) {
+          runningInstances.set(instance.instanceKey, instance);
+        } else {
+          console.log(`Instance ${instance.instanceKey} is no longer running`);
+        }
+      }
+      
+      // Save the verified instances back to file
+      saveRunningInstances();
+      console.log('Loaded running instances:', Array.from(runningInstances.values()));
+    }
+  } catch (error) {
+    console.error('Error loading running instances:', error);
+  }
+}
+
+// Save running instances to file
+function saveRunningInstances() {
+  try {
+    const instances = Array.from(runningInstances.values());
+    fs.writeFileSync(INSTANCES_FILE, JSON.stringify(instances, null, 2));
+  } catch (error) {
+    console.error('Error saving running instances:', error);
+  }
+}
+
+// Function to add a running instance
+function addRunningInstance(nodeIndex, pid, sshConfig) {
+  const machineKey = sshConfig.sshHost; // Key for machine
+  const instanceKey = `${sshConfig.sshHost}_${nodeIndex}`; // Key for instance
+
+  // Check if machine already has an instance
+  for (const [key, instance] of runningInstances.entries()) {
+    if (instance.machineIp === sshConfig.sshHost) {
+      throw new Error(`Machine ${sshConfig.sshHost} already has a running instance`);
+    }
+  }
+
+  const instance = {
+    pid,
+    startTime: new Date(),
+    sshConfig,
+    status: 'running',
+    nodeIndex,
+    machineIp: sshConfig.sshHost,
+    instanceKey
+  };
+
+  runningInstances.set(instanceKey, instance);
+  saveRunningInstances();
+  return instance;
+}
+
+// Function to remove a running instance
+function removeRunningInstance(nodeIndex, sshHost) {
+  const instanceKey = `${sshHost}_${nodeIndex}`;
+  runningInstances.delete(instanceKey);
+  saveRunningInstances();
+}
+
+// Function to get all running instances
+function getRunningInstances() {
+  return Array.from(runningInstances.values());
+}
+
+// Function to check if a node index is already running on any machine
+function isNodeIndexRunning(nodeIndex) {
+  for (const [key, instance] of runningInstances.entries()) {
+    if (instance.nodeIndex === nodeIndex) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Function to check if a machine already has a running instance
+function isMachineRunning(sshHost) {
+  for (const [key, instance] of runningInstances.entries()) {
+    if (instance.machineIp === sshHost) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const app = express();
 const port = process.env.PORT || 3001; // Use environment variable PORT or default to 3002
 
@@ -22,7 +135,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../build')));
 
 // Create HTTP server
-const server = require('http').createServer(app);
+const server = http.createServer(app);
 
 // Create WebSocket server attached to the HTTP server
 const wss = new WebSocket.Server({ server });
@@ -235,46 +348,28 @@ app.post('/api/data-collection/test-connection', async (req, res) => {
   }
 });
 
-// Stop traffic processes endpoint
-app.post('/api/traffic-generator/stop', async (req, res) => {
-  try {
-    const { ...sshConfig } = req.body;
-    const ssh = await createSSHConnection(sshConfig);
-
-    // Kill any running traffic processes
-    const commands = [
-      "pkill -f 'run_traffic.sh'",  // Kill the main script
-      "pkill -f 'traffic_generator'", // Kill the traffic generator process
-      "pkill -f 'tcpdump'", // Kill any tcpdump processes
-      "pkill -f 'iperf'", // Kill any iperf processes
-    ];
-
-    for (const cmd of commands) {
-      try {
-        await ssh.execCommand(cmd);
-      } catch (error) {
-        // Ignore errors if process is not found
-        console.log(`Command ${cmd} returned:`, error.message);
-      }
-    }
-
-    ssh.dispose();
-    res.json({ message: 'Traffic processes stopped successfully' });
-  } catch (error) {
-    console.error('Stop Traffic Error:', error);
-    res.status(500).json({ 
-      error: 'Failed to stop traffic processes',
-      details: error.message 
-    });
-  }
-});
-
 // Traffic Generator endpoint
 app.post('/api/traffic-generator/run', async (req, res) => {
   let ssh = null;
   try {
     const { interface, moatPrivateIp, privateIp, nodeIndex, totalDuration, ...sshConfig } = req.body;
     
+    // Check if this node index is already running on any machine
+    if (isNodeIndexRunning(nodeIndex)) {
+      return res.status(400).json({ 
+        error: 'Traffic generator with this node index is already running',
+        details: `Node index ${nodeIndex} is already in use on another machine`
+      });
+    }
+
+    // Check if this machine already has a running instance
+    if (isMachineRunning(sshConfig.sshHost)) {
+      return res.status(400).json({
+        error: 'Machine already has a running instance',
+        details: `Machine ${sshConfig.sshHost} already has a traffic generator running`
+      });
+    }
+
     console.log('Starting traffic generation with config:', {
       interface,
       moatPrivateIp,
@@ -374,6 +469,9 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     const pid = pidResult.stdout.trim();
     console.log('Process PID:', pid);
 
+    // Add to running instances
+    const instance = addRunningInstance(nodeIndex, pid, sshConfig);
+
     // Check if the process is running
     console.log('Checking if process is running...');
     const checkProcess = await ssh.execCommand(`ps -p ${pid} | grep -v TTY`);
@@ -387,7 +485,9 @@ app.post('/api/traffic-generator/run', async (req, res) => {
         stderr: result.stderr,
         processStatus: checkProcess.stdout,
         pid: pid,
-        logFile: `/api/logs/${logFileName}`
+        logFile: `/api/logs/${logFileName}`,
+        nodeIndex: nodeIndex,
+        instance: instance
       }
     });
   } catch (error) {
@@ -403,54 +503,157 @@ app.post('/api/traffic-generator/run', async (req, res) => {
   }
 });
 
-// Add cleanup endpoint
-app.post('/api/traffic-generator/cleanup', async (req, res) => {
+// Get running instances endpoint
+app.get('/api/traffic-generator/instances', (req, res) => {
   try {
-    const { pid, ...sshConfig } = req.body;
-    const ssh = await createSSHConnection(sshConfig);
+    const instances = getRunningInstances();
+    res.json({ instances });
+  } catch (error) {
+    console.error('Error getting running instances:', error);
+    res.status(500).json({ error: 'Failed to get running instances' });
+  }
+});
+
+// Stop traffic generator endpoint
+app.post('/api/traffic-generator/stop', async (req, res) => {
+  let ssh = null;
+  try {
+    const { pid, nodeIndex, sshHost, sshUsername, sshPassword, sshKeyPath } = req.body;
     
-    // Kill the process and its children
-    await ssh.execCommand(`pkill -P ${pid}`);
+    // Validate required SSH credentials
+    if (!sshHost || !sshUsername || (!sshPassword && !sshKeyPath)) {
+      return res.status(400).json({
+        error: 'Missing required SSH credentials',
+        details: 'SSH host, username, and either password or key path are required to stop processes'
+      });
+    }
+
+    // First verify if the process is still running
+    const sshConfig = {
+      sshHost,
+      sshUsername,
+      sshPassword,
+      sshKeyPath
+    };
+
+    // Test SSH connection before proceeding
+    try {
+      ssh = await createSSHConnection(sshConfig);
+      console.log('SSH connection established for stop operation');
+    } catch (error) {
+      return res.status(401).json({
+        error: 'Failed to establish SSH connection',
+        details: 'Invalid SSH credentials or connection failed'
+      });
+    }
+
+    if (pid) {
+      const isRunning = await verifyProcess(sshConfig, pid);
+      if (!isRunning) {
+        // Process is not running, just remove from our tracking
+        if (nodeIndex) {
+          removeRunningInstance(nodeIndex, sshHost);
+        }
+        return res.json({ 
+          message: 'Process was not running, removed from tracking',
+          stoppedPid: pid
+        });
+      }
+    }
+    
+    if (pid) {
+      // Stop specific process by PID
+      try {
+        await ssh.execCommand(`kill ${pid}`);
+        // Verify the process was stopped
+        const checkResult = await ssh.execCommand(`ps -p ${pid} | grep -v TTY`);
+        if (checkResult.stdout.trim().length === 0) {
+          // Process was successfully stopped
+          if (nodeIndex) {
+            removeRunningInstance(nodeIndex, sshHost);
+          }
+        } else {
+          // Process is still running, try force kill
+          await ssh.execCommand(`kill -9 ${pid}`);
+          if (nodeIndex) {
+            removeRunningInstance(nodeIndex, sshHost);
+          }
+        }
+      } catch (error) {
+        console.error('Error stopping process:', error);
+        // Even if there's an error, remove from tracking
+        if (nodeIndex) {
+          removeRunningInstance(nodeIndex, sshHost);
+        }
+      }
+    } else {
+      // Kill all traffic generator processes
+      try {
+        await ssh.execCommand('pkill -f run_traffic.sh');
+        // Clear all running instances for this machine
+        for (const [key, instance] of runningInstances.entries()) {
+          if (instance.machineIp === sshHost) {
+            runningInstances.delete(key);
+          }
+        }
+        saveRunningInstances();
+      } catch (error) {
+        console.error('Error stopping all processes:', error);
+        // Even if there's an error, remove from tracking
+        for (const [key, instance] of runningInstances.entries()) {
+          if (instance.machineIp === sshHost) {
+            runningInstances.delete(key);
+          }
+        }
+        saveRunningInstances();
+      }
+    }
+    
+    ssh.dispose();
+    res.json({ 
+      message: 'Traffic generator stopped successfully',
+      stoppedPid: pid || 'all'
+    });
+  } catch (error) {
+    console.error('Stop Traffic Generator Error:', error);
+    if (ssh) {
+      ssh.dispose();
+    }
+    // Even if there's an error, try to remove from tracking
+    if (req.body.nodeIndex && req.body.sshHost) {
+      removeRunningInstance(req.body.nodeIndex, req.body.sshHost);
+    }
+    res.status(500).json({ 
+      error: 'Failed to stop traffic generator',
+      details: error.message
+    });
+  }
+});
+
+// Cleanup endpoint for stopping tail process
+app.post('/api/traffic-generator/cleanup', async (req, res) => {
+  let ssh = null;
+  try {
+    const { pid, sshHost, sshUsername, sshPassword, sshKeyPath } = req.body;
+    
+    ssh = await createSSHConnection({
+      sshHost,
+      sshUsername,
+      sshPassword,
+      sshKeyPath
+    });
+    
+    // Kill the tail process
     await ssh.execCommand(`kill ${pid}`);
     
     ssh.dispose();
     res.json({ message: 'Cleanup completed successfully' });
   } catch (error) {
     console.error('Cleanup Error:', error);
+    if (ssh) {
+      ssh.dispose();
+    }
     res.status(500).json({ error: 'Failed to cleanup processes' });
-  }
-});
-
-// Data Collection endpoint
-app.post('/api/data-collection/run', async (req, res) => {
-  try {
-    const { mongodbUsername, mongodbPassword, mongodbHost, mongodbDatabase, mongodbCollection, autoRestart, ...sshConfig } = req.body;
-    
-    const ssh = await createSSHConnection(sshConfig);
-    
-    // Clone repository if not exists
-    await ssh.execCommand('if [ ! -d "TrafficLogger" ]; then git clone https://github.com/shugo-labs/dataprox.git; fi', {
-      cwd: '/root'
-    });
-    
-    // Create .env file
-    const envContent = `MONGODB_USERNAME=${mongodbUsername}
-MONGODB_PASSWORD=${mongodbPassword}
-MONGODB_HOST=${mongodbHost}
-MONGODB_DATABASE=${mongodbDatabase}
-MONGODB_COLLECTION=${mongodbCollection}`;
-    
-    await ssh.execCommand(`echo '${envContent}' > /root/TrafficLogger/.env`);
-    
-    // Run the data collection script
-    const command = `cd /root/TrafficLogger && ./run_data_collection.sh`;
-    await ssh.execCommand(command);
-    
-    ssh.dispose();
-    res.json({ message: 'Data collection started successfully' });
-  } catch (error) {
-    console.error('Data Collection Error:', error);
-    res.status(500).json({ error: 'Failed to start data collection' });
   }
 });
 
@@ -469,19 +672,9 @@ app.delete('/api/traffic-generator/logs/:filename', (req, res) => {
   }
 });
 
-// The "catchall" handler: for any request that doesn't
-// match one above, send back React's index.html file.
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../build', 'index.html'));
+// Initialize server
+loadRunningInstances().then(() => {
+  server.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
 });
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something broke!' });
-});
-
-// Start the server
-server.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-}); 

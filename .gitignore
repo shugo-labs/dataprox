@@ -1,0 +1,55 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Production
+/build
+/dist
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Server logs and instances
+/server/logs
+/server/running_instances.json
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Traffic Generator specific
+/TrafficGenerator/logs
+/TrafficGenerator/*.log
+/TrafficGenerator/tmp
+/TrafficGenerator/*.pid
+
+# Data Collection specific
+/DataCollection/logs
+/DataCollection/*.log
+/DataCollection/tmp
+/DataCollection/*.pid
+
+# Temporary files
+*.tmp
+*.temp
+*.pid
+*.bak 

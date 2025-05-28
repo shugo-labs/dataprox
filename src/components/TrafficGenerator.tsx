@@ -13,6 +13,13 @@ import {
   ListItem,
   ListItemText,
   IconButton,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import axios from 'axios';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -20,18 +27,19 @@ import DeleteIcon from '@mui/icons-material/Delete';
 
 interface TrafficGeneratorProps {}
 
-interface ProcessDetails {
-  stdout: string;
-  stderr: string;
-  processStatus: string;
-  pid: string;
-  processStatusAfter5s: string;
-}
-
 interface LogFile {
   name: string;
   size: number;
   created: string;
+}
+
+interface RunningInstance {
+  nodeIndex: number;
+  pid: string;
+  startTime: string;
+  status: string;
+  machineIp: string;
+  instanceKey: string;
 }
 
 const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
@@ -53,13 +61,13 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
-  const [processDetails, setProcessDetails] = useState<ProcessDetails | null>(null);
   const [logFiles, setLogFiles] = useState<LogFile[]>([]);
   const [selectedLogFile, setSelectedLogFile] = useState<string | null>(null);
   const [logContent, setLogContent] = useState<string>('');
   const [wsConnected, setWsConnected] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [runningInstances, setRunningInstances] = useState<RunningInstance[]>([]);
 
   useEffect(() => {
     // Fetch log files when component mounts
@@ -79,6 +87,25 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       }
     };
   }, [autoRefresh, ws]);
+
+  // Add effect for fetching running instances
+  useEffect(() => {
+    const fetchInstances = async () => {
+      try {
+        const response = await fetch('/api/traffic-generator/instances');
+        const data = await response.json();
+        setRunningInstances(data.instances);
+      } catch (error) {
+        console.error('Error fetching running instances:', error);
+      }
+    };
+
+    // Fetch immediately and then every 5 seconds
+    fetchInstances();
+    const interval = setInterval(fetchInstances, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchLogFiles = async () => {
     try {
@@ -181,19 +208,116 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
     }
   };
 
+  const handleStopInstance = async (pid: string, nodeIndex: number, machineIp: string) => {
+    // Check if we have the required SSH credentials
+    if (!formData.sshUsername || (!formData.sshPassword && !formData.sshKeyPath)) {
+      setError('SSH credentials are required to stop the instance. Please provide SSH username and either password or key path.');
+      return;
+    }
+
+    setStopping(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await axios.post('/api/traffic-generator/stop', {
+        pid,
+        nodeIndex,
+        sshHost: machineIp,
+        sshUsername: formData.sshUsername,
+        sshPassword: formData.sshPassword,
+        sshKeyPath: formData.sshKeyPath,
+      });
+
+      setSuccess(`Traffic generator instance ${nodeIndex} stopped successfully!`);
+      
+      // Refresh running instances
+      const instancesResponse = await fetch('/api/traffic-generator/instances');
+      const instancesData = await instancesResponse.json();
+      setRunningInstances(instancesData.instances);
+    } catch (err: any) {
+      setError(err.response?.data?.details || 'Failed to stop traffic generator instance. Please try again.');
+      console.error('Error:', err);
+    } finally {
+      setStopping(false);
+    }
+  };
+
+  const handleStop = async () => {
+    // Check if we have the required SSH credentials
+    if (!formData.sshHost || !formData.sshUsername || (!formData.sshPassword && !formData.sshKeyPath)) {
+      setError('SSH credentials are required to stop the instance. Please provide SSH host, username and either password or key path.');
+      return;
+    }
+
+    setStopping(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // Stop all traffic processes for the current machine
+      const stopResponse = await axios.post('/api/traffic-generator/stop', {
+        sshHost: formData.sshHost,
+        sshUsername: formData.sshUsername,
+        sshPassword: formData.sshPassword,
+        sshKeyPath: formData.sshKeyPath,
+      });
+
+      setSuccess('All traffic processes stopped successfully!');
+      
+      // Refresh running instances
+      const instancesResponse = await fetch('/api/traffic-generator/instances');
+      const instancesData = await instancesResponse.json();
+      setRunningInstances(instancesData.instances);
+    } catch (err: any) {
+      setError(err.response?.data?.details || 'Failed to stop traffic processes. Please try again.');
+      console.error('Error:', err);
+    } finally {
+      setStopping(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if node index is already in use on any machine
+    const nodeIndexNum = parseInt(formData.nodeIndex);
+    if (runningInstances.some(instance => instance.nodeIndex === nodeIndexNum)) {
+      setError(`Node index ${nodeIndexNum} is already in use on another machine. Please choose a different node index.`);
+      return;
+    }
+
+    // Check if this machine already has a running instance
+    if (runningInstances.some(instance => instance.machineIp === formData.sshHost)) {
+      setError(`Machine ${formData.sshHost} already has a running instance. Only one instance per machine is allowed.`);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(null);
-    setProcessDetails(null);
 
     try {
       const response = await axios.post('/api/traffic-generator/run', formData);
       setSuccess('Traffic generation started successfully!');
-      if (response.data.details) {
-        setProcessDetails(response.data.details);
-      }
+      
+      // Refresh running instances
+      const instancesResponse = await fetch('/api/traffic-generator/instances');
+      const instancesData = await instancesResponse.json();
+      setRunningInstances(instancesData.instances);
+      
+      // Reset form data after successful submission
+      setFormData({
+        sshHost: '',
+        sshUsername: '',
+        sshPassword: '',
+        sshKeyPath: '',
+        interface: '',
+        moatPrivateIp: '',
+        privateIp: '',
+        nodeIndex: '',
+        totalDuration: '',
+      });
     } catch (err: any) {
       setError(err.response?.data?.details || 'Failed to start traffic generation. Please try again.');
       console.error('Error:', err);
@@ -202,46 +326,56 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
     }
   };
 
-  const handleStop = async () => {
-    setStopping(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      // First stop the traffic processes
-      const stopResponse = await axios.post('/api/traffic-generator/stop', {
-        sshHost: formData.sshHost,
-        sshUsername: formData.sshUsername,
-        sshPassword: formData.sshPassword,
-        sshKeyPath: formData.sshKeyPath,
-      });
-
-      // Then cleanup the tail process if we have a PID
-      if (processDetails?.pid) {
-        await axios.post('/api/traffic-generator/cleanup', {
-          pid: processDetails.pid,
-          sshHost: formData.sshHost,
-          sshUsername: formData.sshUsername,
-          sshPassword: formData.sshPassword,
-          sshKeyPath: formData.sshKeyPath,
-        });
-      }
-
-      setSuccess('Traffic processes stopped successfully!');
-      setProcessDetails(null);
-    } catch (err) {
-      setError('Failed to stop traffic processes. Please try again.');
-      console.error('Error:', err);
-    } finally {
-      setStopping(false);
-    }
-  };
-
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 800, mx: 'auto' }}>
       <Typography variant="h5" gutterBottom>
         Traffic Generator Configuration
       </Typography>
+
+      {/* Running Instances Section */}
+      {runningInstances.length > 0 && (
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Running Instances
+          </Typography>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Machine IP</TableCell>
+                  <TableCell>Node Index</TableCell>
+                  <TableCell>PID</TableCell>
+                  <TableCell>Start Time</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {runningInstances.map((instance) => (
+                  <TableRow key={instance.instanceKey}>
+                    <TableCell>{instance.machineIp}</TableCell>
+                    <TableCell>{instance.nodeIndex}</TableCell>
+                    <TableCell>{instance.pid}</TableCell>
+                    <TableCell>{new Date(instance.startTime).toLocaleString()}</TableCell>
+                    <TableCell>{instance.status}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="contained"
+                        color="error"
+                        size="small"
+                        onClick={() => handleStopInstance(instance.pid, instance.nodeIndex, instance.machineIp)}
+                        disabled={stopping}
+                      >
+                        {stopping ? <CircularProgress size={20} /> : 'Stop'}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -259,44 +393,6 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         <Alert severity="success" sx={{ mb: 2 }}>
           {connectionStatus}
         </Alert>
-      )}
-
-      {processDetails && (
-        <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
-          <Typography variant="h6" gutterBottom>
-            Process Details
-          </Typography>
-          {processDetails.stdout && (
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                Output:
-              </Typography>
-              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                {processDetails.stdout}
-              </pre>
-            </Box>
-          )}
-          {processDetails.stderr && (
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                Errors:
-              </Typography>
-              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: 'error.main' }}>
-                {processDetails.stderr}
-              </pre>
-            </Box>
-          )}
-          {processDetails.processStatus && (
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                Process Status:
-              </Typography>
-              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                {processDetails.processStatus}
-              </pre>
-            </Box>
-          )}
-        </Box>
       )}
 
       <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
@@ -359,13 +455,13 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       <Divider sx={{ my: 4 }} />
 
       <Typography variant="h6" sx={{ mb: 2 }}>
-        Traffic Generator Settings
+        Parameters
       </Typography>
       <Grid container spacing={2}>
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label="Network Interface"
+            label="Private Network Interface"
             name="interface"
             value={formData.interface}
             onChange={handleInputChange}
@@ -385,7 +481,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         <Grid item xs={12} sm={6}>
           <TextField
             fullWidth
-            label="Private IP"
+            label="TGEN Private IP"
             name="privateIp"
             value={formData.privateIp}
             onChange={handleInputChange}
@@ -401,6 +497,9 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
             value={formData.nodeIndex}
             onChange={handleInputChange}
             required
+            error={runningInstances.some(instance => instance.nodeIndex === parseInt(formData.nodeIndex))}
+            helperText={runningInstances.some(instance => instance.nodeIndex === parseInt(formData.nodeIndex)) ? 
+              'This node index is already in use on another machine' : ''}
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -422,7 +521,17 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
           variant="contained"
           color="primary"
           fullWidth
-          disabled={loading || stopping}
+          disabled={loading || stopping || 
+            !formData.sshHost || 
+            !formData.sshUsername || 
+            !formData.interface || 
+            !formData.moatPrivateIp || 
+            !formData.privateIp || 
+            !formData.nodeIndex || 
+            !formData.totalDuration ||
+            runningInstances.some(instance => instance.nodeIndex === parseInt(formData.nodeIndex)) ||
+            runningInstances.some(instance => instance.machineIp === formData.sshHost)
+          }
         >
           {loading ? <CircularProgress size={24} /> : 'Start Traffic Generation'}
         </Button>
@@ -431,9 +540,9 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
           color="error"
           fullWidth
           onClick={handleStop}
-          disabled={loading || stopping}
+          disabled={loading || stopping || !formData.sshHost}
         >
-          {stopping ? <CircularProgress size={24} /> : 'Stop Traffic'}
+          {stopping ? <CircularProgress size={24} /> : 'Stop All Traffic'}
         </Button>
       </Stack>
 

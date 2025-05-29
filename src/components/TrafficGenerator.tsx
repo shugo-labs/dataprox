@@ -666,7 +666,9 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
             height: '400px',
             overflow: 'auto'
           }}>
-            {logFiles.map((file) => (
+            {logFiles
+              .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
+              .map((file) => (
               <ListItem
                 key={file.name}
                 secondaryAction={

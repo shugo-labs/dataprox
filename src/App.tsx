@@ -61,6 +61,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none',
+          cursor: 'pointer',
         },
         containedPrimary: {
           background: 'linear-gradient(45deg, #00FF9D 0%, #00FF9D 40%, #03FFF6 60%, #00B8FF 100%)',
@@ -97,6 +98,61 @@ const theme = createTheme({
         root: {
           backgroundColor: '#2A2A4A',
           color: '#E6E6FA',
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          cursor: 'pointer',
+        },
+      },
+    },
+    MuiListItem: {
+      styleOverrides: {
+        root: {
+          cursor: 'pointer',
+        },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          cursor: 'pointer',
+        },
+      },
+    },
+    MuiSwitch: {
+      styleOverrides: {
+        root: {
+          cursor: 'pointer',
+        },
+      },
+    },
+    MuiTypography: {
+      styleOverrides: {
+        root: {
+          cursor: 'default',
+        },
+        h4: {
+          cursor: 'pointer',
+        },
+        h6: {
+          cursor: 'pointer',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          cursor: 'default',
+        },
+      },
+    },
+    MuiTableRow: {
+      styleOverrides: {
+        root: {
+          cursor: 'default',
         },
       },
     },
@@ -160,6 +216,7 @@ function App() {
                 position: 'absolute',
                 left: '50%',
                 transform: 'translateX(-50%)',
+                userSelect: 'none' 
               }}
             >
               Δataprox

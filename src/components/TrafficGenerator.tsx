@@ -69,7 +69,6 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
   const [logContent, setLogContent] = useState<string>('');
   const [wsConnected, setWsConnected] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(false);
   const [runningInstances, setRunningInstances] = useState<RunningInstance[]>([]);
 
   useEffect(() => {
@@ -78,9 +77,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
 
     // Set up auto-refresh interval
     const interval = setInterval(() => {
-      if (autoRefresh) {
-        fetchLogFiles();
-      }
+      fetchLogFiles();
     }, 5000);
 
     return () => {
@@ -89,7 +86,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         ws.close();
       }
     };
-  }, [autoRefresh, ws]);
+  }, [ws]);
 
   // Add effect for fetching and verifying running instances
   useEffect(() => {
@@ -392,7 +389,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       </Typography> */}
 
       {/* Running Instances Section */}
-      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540', userSelect: 'none' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6">
             Running Instances ({runningInstances.length})
@@ -407,7 +404,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
                 <TableCell>PID</TableCell>
                 <TableCell>Start Time</TableCell>
                 <TableCell>Duration</TableCell>
-                <TableCell>Receiver IP</TableCell>
+                <TableCell>Moat IP</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -464,10 +461,10 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         </Alert>
       )}
 
-      <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
+      <Typography variant="h6" sx={{ mt: 3, mb: 2, userSelect: 'none' }}>
         SSH Connection
       </Typography>
-      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540', userSelect: 'none' }}>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}>
             <TextField
@@ -537,10 +534,10 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
 
       <Divider sx={{ my: 4 }} />
 
-      <Typography variant="h6" sx={{ mb: 2 }}>
+      <Typography variant="h6" sx={{ mb: 2, userSelect: 'none' }}>
         Parameters
       </Typography>
-      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540', userSelect: 'none' }}>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}>
             <TextField
@@ -576,7 +573,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Private IP"
+              label="Tgen Private IP"
               name="privateIp"
               value={formData.privateIp}
               onChange={handleInputChange}
@@ -656,47 +653,19 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       <Divider sx={{ my: 4 }} />
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">
+        <Typography variant="h6" sx={{ userSelect: 'none' }}>
           Log Files
         </Typography>
-        <Box>
-          <Button
-            startIcon={<RefreshIcon />}
-            onClick={fetchLogFiles}
-            disabled={loading}
-          >
-            Refresh
-          </Button>
-          <Button
-            variant={autoRefresh ? 'contained' : 'outlined'}
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            sx={{ 
-              ml: 1,
-              ...(autoRefresh ? {
-                backgroundColor: '#03FFF6',
-                color: '#1B1B3A',
-                '&:hover': {
-                  backgroundColor: '#03FFF6',
-                  opacity: 0.9
-                }
-              } : {
-                borderColor: '#03FFF6',
-                color: '#03FFF6',
-                '&:hover': {
-                  borderColor: '#03FFF6',
-                  backgroundColor: 'rgba(3, 255, 246, 0.1)'
-                }
-              })
-            }}
-          >
-            Auto Refresh
-          </Button>
-        </Box>
       </Box>
 
       <Grid container spacing={2}>
         <Grid item xs={12} md={4}>
-          <List sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
+          <List sx={{ 
+            bgcolor: 'background.paper', 
+            borderRadius: 1,
+            height: '400px',
+            overflow: 'auto'
+          }}>
             {logFiles.map((file) => (
               <ListItem
                 key={file.name}
@@ -705,6 +674,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
                     edge="end"
                     aria-label="delete"
                     onClick={() => handleDeleteLog(file.name)}
+                    sx={{ cursor: 'pointer' }}
                   >
                     <DeleteIcon />
                   </IconButton>
@@ -716,11 +686,18 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
                   '&:hover': {
                     bgcolor: 'action.hover',
                   },
+                  display: 'flex',
+                  alignItems: 'center',
+                  width: '100%',
+                  '& .MuiListItemText-root': {
+                    flex: '1 1 auto'
+                  }
                 }}
               >
                 <ListItemText
                   primary={file.name}
                   secondary={`${(file.size / 1024).toFixed(2)} KB - ${new Date(file.created).toLocaleString()}`}
+                  sx={{ cursor: 'pointer' }}
                 />
               </ListItem>
             ))}
@@ -734,14 +711,16 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
               p: 2,
               height: '400px',
               overflow: 'auto',
+              display: 'flex',
+              flexDirection: 'column'
             }}
           >
             {selectedLogFile ? (
-              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', flex: 1 }}>
                 {logContent || 'Loading log content...'}
               </pre>
             ) : (
-              <Typography color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
+              <Typography color="text.secondary" sx={{ textAlign: 'center', mt: 2, userSelect: 'none' }}>
                 Select a log file to view its contents
               </Typography>
             )}

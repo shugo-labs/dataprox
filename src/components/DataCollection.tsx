@@ -56,7 +56,6 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
   const [runningInstances, setRunningInstances] = useState<RunningInstance[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(false);
 
   // Add effect for auto-clearing success messages
   useEffect(() => {
@@ -96,18 +95,6 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
       }
     } catch (error) {
       console.error('Error fetching running instances:', error);
-    }
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await fetchRunningInstances();
-      setSuccess('Running instances refreshed');
-    } catch (error) {
-      setError('Failed to refresh running instances');
-    } finally {
-      setRefreshing(false);
     }
   };
 
@@ -303,9 +290,9 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
       </Box> */}
 
       {/* Running Instances Section */}
-      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540', userSelect: 'none' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6">
+          <Typography variant="h6" sx={{ userSelect: 'none' }}>
             Running Instances ({runningInstances.length})
           </Typography>
         </Box>
@@ -313,11 +300,11 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Machine IP</TableCell>
-                <TableCell>PID</TableCell>
-                <TableCell>Start Time</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Actions</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Machine IP</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>PID</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Start Time</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Status</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -374,10 +361,10 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         </Alert>
       )}
 
-      <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
+      <Typography variant="h6" sx={{ mb: 2, userSelect: 'none' }}>
         SSH Connection
       </Typography>
-      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540', userSelect: 'none' }}>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}>
             <TextField
@@ -450,7 +437,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
 
       <Divider sx={{ my: 4 }} />
 
-      <Typography variant="h6" sx={{ mb: 2 }}>
+      <Typography variant="h6" sx={{ mb: 2, userSelect: 'none' }}>
         MongoDB Configuration
       </Typography>
       <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
@@ -520,7 +507,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
           />
         }
         label="Auto-restart on failure"
-        sx={{ mt: 2 }}
+        sx={{ mt: 2, userSelect:'none' }}
       />
 
       <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>

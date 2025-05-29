@@ -296,14 +296,14 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
 
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 800, mx: 'auto', mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      {/* <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h5">
           Data Collection Configuration
         </Typography>
-      </Box>
+      </Box> */}
 
       {/* Running Instances Section */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6">
             Running Instances ({runningInstances.length})
@@ -377,52 +377,54 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
       <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
         SSH Connection
       </Typography>
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="SSH Host"
-            name="sshHost"
-            value={formData.sshHost}
-            onChange={handleInputChange}
-            required
-            error={runningInstances.some(instance => instance.machineIp === formData.sshHost)}
-            helperText={runningInstances.some(instance => instance.machineIp === formData.sshHost) ? 
-              'This machine already has a running instance' : ''}
-          />
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="SSH Host"
+              name="sshHost"
+              value={formData.sshHost}
+              onChange={handleInputChange}
+              required
+              error={runningInstances.some(instance => instance.machineIp === formData.sshHost)}
+              helperText={runningInstances.some(instance => instance.machineIp === formData.sshHost) ? 
+                'This machine already has a running instance' : ''}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="SSH Username"
+              name="sshUsername"
+              value={formData.sshUsername}
+              onChange={handleInputChange}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="SSH Password"
+              name="sshPassword"
+              type="password"
+              value={formData.sshPassword}
+              onChange={handleInputChange}
+              helperText="Password if using pwd authentication"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="SSH Key Path"
+              name="sshKeyPath"
+              value={formData.sshKeyPath}
+              onChange={handleInputChange}
+              helperText="Path to private key file if using key-based authentication"
+            />
+          </Grid>
         </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="SSH Username"
-            name="sshUsername"
-            value={formData.sshUsername}
-            onChange={handleInputChange}
-            required
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="SSH Password"
-            name="sshPassword"
-            type="password"
-            value={formData.sshPassword}
-            onChange={handleInputChange}
-            helperText="Password if using pwd authentication"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="SSH Key Path"
-            name="sshKeyPath"
-            value={formData.sshKeyPath}
-            onChange={handleInputChange}
-            helperText="Path to private key file if using key-based authentication"
-          />
-        </Grid>
-      </Grid>
+      </Paper>
 
       <Button
         variant="outlined"
@@ -451,60 +453,62 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
       <Typography variant="h6" sx={{ mb: 2 }}>
         MongoDB Configuration
       </Typography>
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="MongoDB Username"
-            name="mongodbUsername"
-            value={formData.mongodbUsername}
-            onChange={handleInputChange}
-            helperText="Optional - leave empty for local MongoDB without authentication"
-          />
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="MongoDB Username"
+              name="mongodbUsername"
+              value={formData.mongodbUsername}
+              onChange={handleInputChange}
+              helperText="Optional - leave empty for local MongoDB without authentication"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="MongoDB Password"
+              name="mongodbPassword"
+              type="password"
+              value={formData.mongodbPassword}
+              onChange={handleInputChange}
+              helperText="Optional - leave empty for local MongoDB without authentication"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="MongoDB Host"
+              name="mongodbHost"
+              value={formData.mongodbHost}
+              onChange={handleInputChange}
+              required
+              placeholder="localhost or 127.0.0.1 for local MongoDB"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="MongoDB Database"
+              name="mongodbDatabase"
+              value={formData.mongodbDatabase}
+              onChange={handleInputChange}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="MongoDB Collection"
+              name="mongodbCollection"
+              value={formData.mongodbCollection}
+              onChange={handleInputChange}
+              required
+            />
+          </Grid>
         </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="MongoDB Password"
-            name="mongodbPassword"
-            type="password"
-            value={formData.mongodbPassword}
-            onChange={handleInputChange}
-            helperText="Optional - leave empty for local MongoDB without authentication"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="MongoDB Host"
-            name="mongodbHost"
-            value={formData.mongodbHost}
-            onChange={handleInputChange}
-            required
-            placeholder="localhost or 127.0.0.1 for local MongoDB"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="MongoDB Database"
-            name="mongodbDatabase"
-            value={formData.mongodbDatabase}
-            onChange={handleInputChange}
-            required
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="MongoDB Collection"
-            name="mongodbCollection"
-            value={formData.mongodbCollection}
-            onChange={handleInputChange}
-            required
-          />
-        </Grid>
-      </Grid>
+      </Paper>
 
       <FormControlLabel
         control={
@@ -561,31 +565,6 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
           {stopping ? <CircularProgress size={24} /> : 'Stop All'}
         </Button>
       </Box>
-
-      <Button
-        variant={autoRefresh ? 'contained' : 'outlined'}
-        onClick={() => setAutoRefresh(!autoRefresh)}
-        sx={{ 
-          ml: 1,
-          ...(autoRefresh ? {
-            backgroundColor: '#03FFF6',
-            color: '#1B1B3A',
-            '&:hover': {
-              backgroundColor: '#03FFF6',
-              opacity: 0.9
-            }
-          } : {
-            borderColor: '#03FFF6',
-            color: '#03FFF6',
-            '&:hover': {
-              borderColor: '#03FFF6',
-              backgroundColor: 'rgba(3, 255, 246, 0.1)'
-            }
-          })
-        }}
-      >
-        Auto Refresh
-      </Button>
     </Box>
   );
 };

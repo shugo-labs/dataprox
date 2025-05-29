@@ -26,8 +26,8 @@ const theme = createTheme({
       main: '#00FF9D',
     },
     background: {
-      default: '#1B1B3A',
-      paper: '#2A2A4A',
+      default: '#14142A',  // Darker purple for main background
+      paper: '#1E1E3A',   // Darker purple for paper elements
     },
     text: {
       primary: '#E6E6FA',  // light lavender-ish white text
@@ -52,7 +52,7 @@ const theme = createTheme({
     MuiCssBaseline: {
       styleOverrides: {
         body: {
-          backgroundColor: '#1B1B3A',
+          backgroundColor: '#14142A',  // Matching the new darker background
           color: '#E6E6FA',
         },
       },

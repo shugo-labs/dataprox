@@ -41,6 +41,7 @@ interface RunningInstance {
   machineIp: string;
   moatPublicIp: string;
   instanceKey: string;
+  totalDuration: number;
 }
 
 const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
@@ -97,6 +98,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         const response = await fetch('/api/traffic-generator/verify-instances');
         const data = await response.json();
         if (data.instances) {
+          console.log('Received instances:', data.instances); // Debug log
           setRunningInstances(data.instances);
           // If instances were removed, show a message
           if (data.hasChanges) {
@@ -249,12 +251,14 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
 
     try {
       const response = await axios.post('/api/traffic-generator/stop', {
-        pid,
-        nodeIndex,
         sshHost: machineIp,
         sshUsername: formData.sshUsername,
         sshPassword: formData.sshPassword,
         sshKeyPath: formData.sshKeyPath,
+        commands: [
+          `pkill -P ${pid}`,  // Kill all child processes of the run_traffic.sh
+          `kill ${pid}`       // Kill the run_traffic.sh process itself
+        ]
       });
 
       setSuccess(`Traffic generator instance ${nodeIndex} stopped successfully!`);
@@ -289,6 +293,10 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         sshUsername: formData.sshUsername,
         sshPassword: formData.sshPassword,
         sshKeyPath: formData.sshKeyPath,
+        commands: [
+          '/usr/bin/pkill -f "run_traffic.sh"',
+          '/usr/bin/pkill -f "python3"'
+        ]
       });
 
       setSuccess('All traffic processes stopped successfully!');
@@ -310,6 +318,8 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
     
     // Check if node index is already in use for the same receiver IP
     const nodeIndexNum = parseInt(formData.nodeIndex);
+    const durationNum = parseInt(formData.totalDuration);
+    
     if (runningInstances.some(instance => 
       parseInt(instance.nodeIndex.toString()) === nodeIndexNum && 
       instance.moatPublicIp === formData.moatPublicIp
@@ -329,13 +339,30 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
     setSuccess(null);
 
     try {
-      const response = await axios.post('/api/traffic-generator/run', formData);
+      // Ensure totalDuration is sent as a number
+      const submitData = {
+        ...formData,
+        totalDuration: durationNum
+      };
+      
+      console.log('Submitting form data:', submitData);
+      const response = await axios.post('/api/traffic-generator/run', submitData);
+      console.log('Run response:', response.data);
+      
       setSuccess('Traffic generation started successfully!');
       
       // Refresh running instances
       const instancesResponse = await fetch('/api/traffic-generator/instances');
       const instancesData = await instancesResponse.json();
-      setRunningInstances(instancesData.instances);
+      console.log('Fetched instances:', instancesData);
+      
+      // Ensure duration is a number in the instances data
+      const processedInstances = instancesData.instances.map((instance: any) => ({
+        ...instance,
+        totalDuration: durationNum // Use the duration from the form
+      }));
+      
+      setRunningInstances(processedInstances);
       
       // Reset form data after successful submission
       setFormData({
@@ -360,12 +387,12 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
 
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 800, mx: 'auto' }}>
-      <Typography variant="h5" gutterBottom>
+      {/* <Typography variant="h5" gutterBottom>
         Traffic Generator Configuration
-      </Typography>
+      </Typography> */}
 
       {/* Running Instances Section */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6">
             Running Instances ({runningInstances.length})
@@ -379,7 +406,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
                 <TableCell>Node Index</TableCell>
                 <TableCell>PID</TableCell>
                 <TableCell>Start Time</TableCell>
-                <TableCell>Status</TableCell>
+                <TableCell>Duration</TableCell>
                 <TableCell>Receiver IP</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
@@ -392,7 +419,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
                     <TableCell>{instance.nodeIndex}</TableCell>
                     <TableCell>{instance.pid}</TableCell>
                     <TableCell>{new Date(instance.startTime).toLocaleString()}</TableCell>
-                    <TableCell>{instance.status}</TableCell>
+                    <TableCell>{instance.totalDuration || 0}s</TableCell>
                     <TableCell>{instance.moatPublicIp}</TableCell>
                     <TableCell>
                       <Button
@@ -440,49 +467,51 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
         SSH Connection
       </Typography>
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="SSH Host"
-            name="sshHost"
-            value={formData.sshHost}
-            onChange={handleInputChange}
-            required
-          />
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="SSH Host"
+              name="sshHost"
+              value={formData.sshHost}
+              onChange={handleInputChange}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="SSH Username"
+              name="sshUsername"
+              value={formData.sshUsername}
+              onChange={handleInputChange}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="SSH Password"
+              name="sshPassword"
+              type="password"
+              value={formData.sshPassword}
+              onChange={handleInputChange}
+              helperText="Password if using pwd authentication"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="SSH Key Path"
+              name="sshKeyPath"
+              value={formData.sshKeyPath}
+              onChange={handleInputChange}
+              helperText="Path to private key file if using key-based authentication"
+            />
+          </Grid>
         </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="SSH Username"
-            name="sshUsername"
-            value={formData.sshUsername}
-            onChange={handleInputChange}
-            required
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="SSH Password"
-            name="sshPassword"
-            type="password"
-            value={formData.sshPassword}
-            onChange={handleInputChange}
-            helperText="Password if using pwd authentication"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="SSH Key Path"
-            name="sshKeyPath"
-            value={formData.sshKeyPath}
-            onChange={handleInputChange}
-            helperText="Path to private key file if using key-based authentication"
-          />
-        </Grid>
-      </Grid>
+      </Paper>
 
       <Button
         variant="outlined"
@@ -511,71 +540,73 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       <Typography variant="h6" sx={{ mb: 2 }}>
         Parameters
       </Typography>
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Interface"
-            name="interface"
-            value={formData.interface}
-            onChange={handleInputChange}
-            required
-          />
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Interface"
+              name="interface"
+              value={formData.interface}
+              onChange={handleInputChange}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Moat Private IP"
+              name="moatPrivateIp"
+              value={formData.moatPrivateIp}
+              onChange={handleInputChange}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Moat Public IP"
+              name="moatPublicIp"
+              value={formData.moatPublicIp}
+              onChange={handleInputChange}
+              required
+              helperText="Public IP of the receiver machine"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Private IP"
+              name="privateIp"
+              value={formData.privateIp}
+              onChange={handleInputChange}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Node Index"
+              name="nodeIndex"
+              value={formData.nodeIndex}
+              onChange={handleInputChange}
+              required
+              type="number"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Total Duration (seconds)"
+              name="totalDuration"
+              value={formData.totalDuration}
+              onChange={handleInputChange}
+              required
+              type="number"
+            />
+          </Grid>
         </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Moat Private IP"
-            name="moatPrivateIp"
-            value={formData.moatPrivateIp}
-            onChange={handleInputChange}
-            required
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Moat Public IP"
-            name="moatPublicIp"
-            value={formData.moatPublicIp}
-            onChange={handleInputChange}
-            required
-            helperText="Public IP of the receiver machine"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Private IP"
-            name="privateIp"
-            value={formData.privateIp}
-            onChange={handleInputChange}
-            required
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Node Index"
-            name="nodeIndex"
-            value={formData.nodeIndex}
-            onChange={handleInputChange}
-            required
-            type="number"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Total Duration (seconds)"
-            name="totalDuration"
-            value={formData.totalDuration}
-            onChange={handleInputChange}
-            required
-            type="number"
-          />
-        </Grid>
-      </Grid>
+      </Paper>
 
       <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
         <Button

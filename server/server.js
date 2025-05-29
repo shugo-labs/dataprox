@@ -72,7 +72,7 @@ function saveRunningInstances() {
 }
 
 // Function to add a running instance
-function addRunningInstance(nodeIndex, pid, sshConfig, moatPublicIp) {
+function addRunningInstance(nodeIndex, pid, sshConfig, moatPublicIp, totalDuration) {
   const instanceKey = `${sshConfig.sshHost}-${nodeIndex}`;
   const instance = {
     nodeIndex: parseInt(nodeIndex),
@@ -82,6 +82,7 @@ function addRunningInstance(nodeIndex, pid, sshConfig, moatPublicIp) {
     machineIp: sshConfig.sshHost,
     moatPublicIp: moatPublicIp,
     instanceKey: instanceKey,
+    totalDuration: parseInt(totalDuration),
     // Store SSH config for verification
     sshConfig: sshConfig,
     sshUsername: sshConfig.sshUsername,
@@ -554,7 +555,7 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     await ssh.execCommand('chmod +x ~/dataprox/TrafficGenerator/run_traffic.sh');
     
     // Create a unique log file name
-    const timestamp = new Date().getTime();
+    const timestamp = Date.now();
     const logFileName = `traffic_${timestamp}.log`;
     const remoteLogFile = `/tmp/${logFileName}`;
     
@@ -622,7 +623,7 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     console.log('Process PID:', pid);
 
     // Add to running instances
-    const instance = addRunningInstance(nodeIndex, pid, sshConfig, moatPublicIp);
+    const instance = addRunningInstance(nodeIndex, pid, sshConfig, moatPublicIp, totalDuration);
 
     // Check if the process is running
     console.log('Checking if process is running...');
@@ -742,6 +743,7 @@ app.post('/api/traffic-generator/stop', async (req, res) => {
       // Kill all traffic generator processes
       try {
         await ssh.execCommand('pkill -f run_traffic.sh');
+        await ssh.execCommand('pkill -f python3');
         // Clear all running instances for this machine
         for (const [key, instance] of runningInstances.entries()) {
           if (instance.machineIp === sshHost) {

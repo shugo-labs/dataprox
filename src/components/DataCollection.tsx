@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Button,
@@ -32,6 +32,12 @@ interface RunningInstance {
   moatPublicIp: string;
 }
 
+interface LogFile {
+  name: string;
+  size: number;
+  created: string;
+}
+
 const DataCollection: React.FC<DataCollectionProps> = () => {
   const [formData, setFormData] = useState({
     // SSH Configuration
@@ -40,9 +46,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
     sshPassword: '',
     sshKeyPath: '',
     // MongoDB Configuration
-    mongodbUsername: '',
-    mongodbPassword: '',
-    mongodbHost: '',
+    mongodbUri: '',
     mongodbDatabase: '',
     mongodbCollection: '',
     autoRestart: true,
@@ -264,9 +268,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         sshUsername: '',
         sshPassword: '',
         sshKeyPath: '',
-        mongodbUsername: '',
-        mongodbPassword: '',
-        mongodbHost: '',
+        mongodbUri: '',
         mongodbDatabase: '',
         mongodbCollection: '',
         autoRestart: true,
@@ -445,33 +447,11 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="MongoDB Username"
-              name="mongodbUsername"
-              value={formData.mongodbUsername}
-              onChange={handleInputChange}
-              helperText="Optional - leave empty for local MongoDB without authentication"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="MongoDB Password"
-              name="mongodbPassword"
-              type="password"
-              value={formData.mongodbPassword}
-              onChange={handleInputChange}
-              helperText="Optional - leave empty for local MongoDB without authentication"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="MongoDB Host"
-              name="mongodbHost"
-              value={formData.mongodbHost}
+              label="MongoDB URI"
+              name="mongodbUri"
+              value={formData.mongodbUri}
               onChange={handleInputChange}
               required
-              placeholder="localhost or 127.0.0.1 for local MongoDB"
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -518,7 +498,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
           disabled={loading || stopping || 
             !formData.sshHost || 
             !formData.sshUsername || 
-            !formData.mongodbHost || 
+            !formData.mongodbUri || 
             !formData.mongodbDatabase || 
             !formData.mongodbCollection ||
             runningInstances.some(instance => instance.machineIp === formData.sshHost)

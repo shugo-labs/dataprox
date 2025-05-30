@@ -27,21 +27,11 @@ class FloodDetector:
         load_dotenv()
 
         # Retrieve individual parameters from the environment
-        username = os.getenv('MONGODB_USERNAME', '')
-        password = os.getenv('MONGODB_PASSWORD', '')
-        host = os.getenv('MONGODB_HOST', 'localhost')
         database = os.getenv('MONGODB_DATABASE', 'ddos_detection')
-        collection = os.getenv("MONGODB_COLLECTION")
+        conn_str = os.getenv('MONGODB_URI', f'mongodb://localhost:27017/{database}')
+        collection = os.getenv('MONGODB_COLLECTION')
 
-        # Construct connection string based on provided credentials
-        if username and password:
-            # With authentication
-            conn_str = f"mongodb://{username}:{password}@{host}/{database}"
-        else:
-            # Without authentication
-            conn_str = f"mongodb://{host}/{database}"
-            
-        print(f"Connecting to MongoDB: {host}")
+        print(f"Connecting to MongoDB: {conn_str}")
         self.client = MongoClient(conn_str, serverSelectionTimeoutMS=5000)
         
         # Test connection

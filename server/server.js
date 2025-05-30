@@ -848,7 +848,7 @@ app.get('/api/traffic-generator/verify-instances', async (req, res) => {
 app.post('/api/data-collection/run', async (req, res) => {
   let ssh = null;
   try {
-    const { mongodbUsername, mongodbPassword, mongodbHost, mongodbDatabase, mongodbCollection, autoRestart, ...sshConfig } = req.body;
+    const { mongodbUri, mongodbDatabase, mongodbCollection, autoRestart, ...sshConfig } = req.body;
     
     // Check if this machine already has a running instance
     if (isDataCollectionRunning(sshConfig.sshHost)) {
@@ -889,51 +889,11 @@ app.post('/api/data-collection/run', async (req, res) => {
 
     console.log('Installing required packages...');
     for (const step of installSteps) {
-      try {
-        console.log(`Executing step: ${step}`);
-        // Add retry logic for apt commands
-        let retries = 3;
-        let lastError = null;
-        
-        while (retries > 0) {
-          try {
-            const result = await ssh.execCommand(step);
-            console.log(`Command output: ${result.stdout}`);
-            if (result.stderr) {
-              console.log(`Command errors: ${result.stderr}`);
-            }
-            
-            if (result.code !== 0) {
-              console.warn(`Warning: Step completed with non-zero exit code: ${result.stderr || result.stdout}`);
-              if (result.stderr && result.stderr.includes('Could not get lock')) {
-                // If it's a lock error, wait and retry
-                console.log('Lock error detected, waiting 5 seconds before retry...');
-                await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-                retries--;
-                continue;
-              }
-            }
-            console.log(`Step completed successfully: ${result.stdout}`);
-            break; // Success, exit retry loop
-          } catch (error) {
-            lastError = error;
-            console.error(`Attempt failed: ${error.message}`);
-            if (error.message && error.message.includes('Could not get lock')) {
-              console.log('Lock error detected, waiting 5 seconds before retry...');
-              await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-              retries--;
-              continue;
-            }
-            throw error; // If it's not a lock error, throw immediately
-          }
-        }
-        
-        if (retries === 0 && lastError) {
-          throw lastError;
-        }
-      } catch (error) {
-        console.error(`Error executing step: ${error.message}`);
-        // Continue with next step even if this one fails
+      const result = await ssh.execCommand(step);
+      if (result.code !== 0) {
+        console.error('Installation step failed:', step);
+        console.error('Error:', result.stderr);
+        throw new Error(`Failed to install required packages: ${result.stderr}`);
       }
     }
 
@@ -942,14 +902,10 @@ app.post('/api/data-collection/run', async (req, res) => {
       # Create/update .env file with the form data
       cat > .env << EOL
 # MongoDB Configuration
-MONGODB_USERNAME=${mongodbUsername || ''}
-MONGODB_PASSWORD=${mongodbPassword || ''}
-MONGODB_HOST=${mongodbHost}
+MONGODB_URI=${mongodbUri}
 MONGODB_DATABASE=${mongodbDatabase}
 MONGODB_COLLECTION=${mongodbCollection}
 AUTO_RESTART=${autoRestart}
-
-# Connection string will be constructed in the script based on these values
 EOL
 
       # Display .env file contents for verification
@@ -961,7 +917,7 @@ EOL
     const envResult = await ssh.execCommand(envCommand);
     console.log('ENV file creation result:', envResult);
 
-    // First, test MongoDB connection with more detailed error handling
+    // Test MongoDB connection with more detailed error handling
     const mongoTestCommand = `python3 -c "
 import sys
 from pymongo import MongoClient
@@ -969,23 +925,13 @@ try:
     print('Attempting to connect to MongoDB...')
     
     # Get environment variables
-    mongodb_host = '${mongodbHost}'
+    mongodb_uri = '${mongodbUri}'
     mongodb_database = '${mongodbDatabase}'
-    mongodb_username = '${mongodbUsername}'
-    mongodb_password = '${mongodbPassword}'
     
-    # Construct connection string based on provided credentials
-    if mongodb_username and mongodb_password:
-        # With authentication
-        conn_str = f'mongodb://{mongodb_username}:{mongodb_password}@{mongodb_host}/{mongodb_database}'
-    else:
-        # Without authentication
-        conn_str = f'mongodb://{mongodb_host}/{mongodb_database}'
-    
-    print(f'Connection string: {conn_str}')
+    print(f'Connection string: {mongodb_uri}')
     
     # Try connection with a timeout
-    client = MongoClient(conn_str, serverSelectionTimeoutMS=5000)
+    client = MongoClient(mongodb_uri, serverSelectionTimeoutMS=5000)
     
     # Force a connection to verify it works
     client.server_info()
@@ -1024,8 +970,7 @@ except Exception as e:
 
       # Log the parameters being passed
       echo "Starting data collection with parameters:" > "$logfile"
-      echo "MongoDB Username: ${mongodbUsername}" >> "$logfile"
-      echo "MongoDB Host: ${mongodbHost}" >> "$logfile"
+      echo "MongoDB URI: ${mongodbUri}" >> "$logfile"
       echo "MongoDB Database: ${mongodbDatabase}" >> "$logfile"
       echo "MongoDB Collection: ${mongodbCollection}" >> "$logfile"
       echo "Auto Restart: ${autoRestart}" >> "$logfile"

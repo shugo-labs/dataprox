@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Button,
@@ -67,6 +67,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
   const [logFiles, setLogFiles] = useState<LogFile[]>([]);
   const [selectedLogFile, setSelectedLogFile] = useState<string | null>(null);
   const [logContent, setLogContent] = useState<string>('');
+  const logContentRef = useRef<HTMLPreElement>(null);
   const [wsConnected, setWsConnected] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [runningInstances, setRunningInstances] = useState<RunningInstance[]>([]);
@@ -134,11 +135,55 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
     }
   }, [connectionStatus]);
 
+  // Add effect for auto-refreshing log content
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    const fetchLogContent = async () => {
+      if (selectedLogFile) {
+        try {
+          const response = await axios.get(`/api/logs/${selectedLogFile}`);
+          setLogContent(response.data.content);
+        } catch (err) {
+          console.error('Error fetching log content:', err);
+        }
+      }
+    };
+
+    // Start polling immediately if there's a selected file
+    if (selectedLogFile) {
+      fetchLogContent();
+      // Poll every 500ms for more frequent updates
+      interval = setInterval(fetchLogContent, 500);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [selectedLogFile]);
+
+  // Add effect for immediate scrolling when content changes
+  useEffect(() => {
+    if (logContentRef.current) {
+      logContentRef.current.scrollTop = logContentRef.current.scrollHeight;
+    }
+  }, [logContent]);
+
   const fetchLogFiles = async () => {
     try {
       const response = await axios.get('/api/logs');
       if (Array.isArray(response.data)) {
-        setLogFiles(response.data);
+        const sortedFiles = response.data.sort((a, b) => 
+          new Date(b.created).getTime() - new Date(a.created).getTime()
+        );
+        setLogFiles(sortedFiles);
+        
+        // Select the most recent file if none is selected
+        if (sortedFiles.length > 0 && !selectedLogFile) {
+          handleLogFileSelect(sortedFiles[0].name);
+        }
       } else {
         console.error('Invalid response format:', response.data);
         setLogFiles([]);
@@ -149,45 +194,9 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
     }
   };
 
-  const handleLogFileSelect = async (fileName: string) => {
+  const handleLogFileSelect = (fileName: string) => {
     setSelectedLogFile(fileName);
     setLogContent('');
-
-    // Close existing WebSocket connection if any
-    if (ws) {
-      ws.close();
-    }
-
-    // Create new WebSocket connection
-    const newWs = new WebSocket('ws://localhost:3002');
-    setWs(newWs);
-
-    newWs.onopen = () => {
-      setWsConnected(true);
-      newWs.send(JSON.stringify({
-        type: 'subscribe',
-        logFile: fileName
-      }));
-    };
-
-    newWs.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'log') {
-        setLogContent(prev => prev + data.content);
-      }
-    };
-
-    newWs.onclose = () => {
-      setWsConnected(false);
-    };
-
-    // Fetch initial log content
-    try {
-      const response = await axios.get(`/api/logs/${fileName}`);
-      setLogContent(response.data.content);
-    } catch (err) {
-      console.error('Error fetching log content:', err);
-    }
   };
 
   const handleDeleteLog = async (fileName: string) => {
@@ -718,7 +727,15 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
             }}
           >
             {selectedLogFile ? (
-              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', flex: 1 }}>
+              <pre 
+                ref={logContentRef}
+                style={{ 
+                  margin: 0, 
+                  whiteSpace: 'pre-wrap', 
+                  flex: 1,
+                  overflow: 'auto'
+                }}
+              >
                 {logContent || 'Loading log content...'}
               </pre>
             ) : (

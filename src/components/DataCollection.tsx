@@ -29,7 +29,7 @@ interface RunningInstance {
   machineIp: string;
   instanceKey: string;
   nodeIndex: number;
-  moatPublicIp: string;
+  tgenPublicIp: string;
 }
 
 interface LogFile {
@@ -51,7 +51,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
     mongodbCollection: '',
     autoRestart: true,
     nodeIndex: '',
-    moatPublicIp: '',
+    tgenPublicIp: '',
   });
   const [loading, setLoading] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -61,6 +61,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
   const [runningInstances, setRunningInstances] = useState<RunningInstance[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
+  const [stoppingInstance, setStoppingInstance] = useState<string | null>(null);
 
   // Add effect for auto-clearing success messages
   useEffect(() => {
@@ -136,14 +137,14 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
     }
   };
 
-  const handleStopInstance = async (pid: string, machineIp: string) => {
+  const handleStopInstance = async (pid: string, machineIp: string, nodeIndex: number) => {
     // Check if we have the required SSH credentials
     if (!formData.sshUsername || (!formData.sshPassword && !formData.sshKeyPath)) {
       setError('SSH credentials are required to stop the instance. Please provide SSH username and either password or key path.');
       return;
     }
 
-    setStopping(true);
+    setStoppingInstance(`${machineIp}-${nodeIndex}`);
     setError(null);
     setSuccess(null);
 
@@ -154,11 +155,18 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         sshUsername: formData.sshUsername,
         sshPassword: formData.sshPassword,
         sshKeyPath: formData.sshKeyPath,
+        nodeIndex
       });
 
       if (response.data.message === 'Data collection stopped successfully') {
         setSuccess('Data collection instance stopped successfully!');
-        // Fetch fresh instances list
+        // Immediately update the local state
+        setRunningInstances(prevInstances => 
+          prevInstances.filter(instance => 
+            !(instance.pid === pid && instance.machineIp === machineIp && instance.nodeIndex === nodeIndex)
+          )
+        );
+        // Then fetch fresh instances list
         const instancesResponse = await fetch('/api/data-collection/instances');
         const instancesData = await instancesResponse.json();
         setRunningInstances(instancesData.instances);
@@ -173,7 +181,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
       const instancesData = await instancesResponse.json();
       setRunningInstances(instancesData.instances);
     } finally {
-      setStopping(false);
+      setStoppingInstance(null);
     }
   };
 
@@ -245,13 +253,12 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if node index is already in use for the same receiver IP
+    // Check if node index is already in use
     const nodeIndexNum = parseInt(formData.nodeIndex);
     if (runningInstances.some(instance => 
-      parseInt(instance.nodeIndex.toString()) === nodeIndexNum && 
-      instance.moatPublicIp === formData.moatPublicIp
+      parseInt(instance.nodeIndex.toString()) === nodeIndexNum
     )) {
-      setError(`Node index ${nodeIndexNum} is already in use for receiver IP ${formData.moatPublicIp}. Please choose a different node index.`);
+      setError(`Node index ${nodeIndexNum} is already in use. Please choose a different node index.`);
       return;
     }
 
@@ -285,7 +292,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         mongodbCollection: '',
         autoRestart: true,
         nodeIndex: '',
-        moatPublicIp: '',
+        tgenPublicIp: ''
       });
     } catch (err: any) {
       setError(err.response?.data?.details || 'Failed to start data collection. Please try again.');
@@ -317,7 +324,8 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
                 <TableCell sx={{ userSelect: 'none' }}>Machine IP</TableCell>
                 <TableCell sx={{ userSelect: 'none' }}>PID</TableCell>
                 <TableCell sx={{ userSelect: 'none' }}>Start Time</TableCell>
-                <TableCell sx={{ userSelect: 'none' }}>Status</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Node Index</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Tgen Public IP</TableCell>
                 <TableCell sx={{ userSelect: 'none' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -328,18 +336,19 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
                     <TableCell>{instance.machineIp}</TableCell>
                     <TableCell>{instance.pid}</TableCell>
                     <TableCell>{new Date(instance.startTime).toLocaleString()}</TableCell>
-                    <TableCell>{instance.status}</TableCell>
+                    <TableCell>{instance.nodeIndex}</TableCell>
+                    <TableCell>{instance.tgenPublicIp}</TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         <Button
                           variant="contained"
                           color="error"
                           size="small"
-                          onClick={() => handleStopInstance(instance.pid, instance.machineIp)}
-                          disabled={stopping}
-                          startIcon={stopping ? <CircularProgress size={16} /> : null}
+                          onClick={() => handleStopInstance(instance.pid, instance.machineIp, instance.nodeIndex)}
+                          disabled={stoppingInstance === `${instance.machineIp}-${instance.nodeIndex}`}
+                          startIcon={stoppingInstance === `${instance.machineIp}-${instance.nodeIndex}` ? <CircularProgress size={16} /> : null}
                         >
-                          Stop
+                          {stoppingInstance === `${instance.machineIp}-${instance.nodeIndex}` ? 'Stopping...' : 'Stop'}
                         </Button>
                       </Box>
                     </TableCell>
@@ -347,7 +356,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
+                  <TableCell colSpan={6} align="center">
                     No running instances
                   </TableCell>
                 </TableRow>
@@ -484,6 +493,27 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
               value={formData.mongodbCollection}
               onChange={handleInputChange}
               required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Node Index"
+              name="nodeIndex"
+              value={formData.nodeIndex}
+              onChange={handleInputChange}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Tgen Public IP"
+              name="tgenPublicIp"
+              value={formData.tgenPublicIp}
+              onChange={handleInputChange}
+              required
+              helperText="Public IP of the traffic generator associated with this node"
             />
           </Grid>
         </Grid>

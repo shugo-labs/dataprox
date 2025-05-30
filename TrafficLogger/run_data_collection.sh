@@ -12,5 +12,8 @@ pip3 install scapy pandas numpy psutil websockets asyncio pymongo python-dotenv
 systemctl enable --now sysstat
 systemctl enable --now snmpd
 
+# Export NODE_INDEX from environment variable or use default
+export NODE_INDEX=${NODE_INDEX:-0}
+
 # Start the data capture script in the background
-pm2 start "python3 collect_features.py" --name collect_features
+pm2 start "python3 collect_features.py" --name collect_features --env NODE_INDEX=$NODE_INDEX

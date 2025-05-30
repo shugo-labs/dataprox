@@ -19,7 +19,7 @@ yarn-error.log*
 
 # Server logs and instances
 /server/logs
-/server/running_instances.json
+//running_instances.json
 
 # Environment variables
 .env

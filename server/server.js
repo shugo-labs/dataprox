@@ -190,12 +190,12 @@ function saveDataCollectionInstances() {
 }
 
 // Function to add a running data collection instance
-function addDataCollectionInstance(pid, sshConfig) {
-  const instanceKey = sshConfig.sshHost; // Key for instance (one per machine)
+function addDataCollectionInstance(pid, sshConfig, nodeIndex, tgenPublicIp) {
+  const instanceKey = `${sshConfig.sshHost}-${nodeIndex}`; // Key for instance (one per machine per node)
 
-  // Check if machine already has an instance
+  // Check if machine already has an instance for this node
   if (runningDataCollection.has(instanceKey)) {
-    throw new Error(`Machine ${sshConfig.sshHost} already has a running data collection instance`);
+    throw new Error(`Machine ${sshConfig.sshHost} already has a running data collection instance for node ${nodeIndex}`);
   }
 
   const instance = {
@@ -204,6 +204,8 @@ function addDataCollectionInstance(pid, sshConfig) {
     sshConfig,
     status: 'running',
     machineIp: sshConfig.sshHost,
+    nodeIndex: parseInt(nodeIndex),
+    tgenPublicIp,
     instanceKey
   };
 
@@ -213,8 +215,9 @@ function addDataCollectionInstance(pid, sshConfig) {
 }
 
 // Function to remove a running data collection instance
-function removeDataCollectionInstance(sshHost) {
-  runningDataCollection.delete(sshHost);
+function removeDataCollectionInstance(sshHost, nodeIndex) {
+  const instanceKey = `${sshHost}-${nodeIndex}`;
+  runningDataCollection.delete(instanceKey);
   saveDataCollectionInstances();
 }
 
@@ -223,9 +226,10 @@ function getDataCollectionInstances() {
   return Array.from(runningDataCollection.values());
 }
 
-// Function to check if a machine already has a running data collection instance
-function isDataCollectionRunning(sshHost) {
-  return runningDataCollection.has(sshHost);
+// Function to check if a machine already has a running data collection instance for a specific node
+function isDataCollectionRunning(sshHost, nodeIndex) {
+  const instanceKey = `${sshHost}-${nodeIndex}`;
+  return runningDataCollection.has(instanceKey);
 }
 
 // Function to verify all running data collection instances
@@ -848,13 +852,13 @@ app.get('/api/traffic-generator/verify-instances', async (req, res) => {
 app.post('/api/data-collection/run', async (req, res) => {
   let ssh = null;
   try {
-    const { mongodbUri, mongodbDatabase, mongodbCollection, autoRestart, ...sshConfig } = req.body;
+    const { mongodbUri, mongodbDatabase, mongodbCollection, autoRestart, nodeIndex, tgenPublicIp, ...sshConfig } = req.body;
     
-    // Check if this machine already has a running instance
-    if (isDataCollectionRunning(sshConfig.sshHost)) {
+    // Check if this machine already has a running instance for this node
+    if (isDataCollectionRunning(sshConfig.sshHost, nodeIndex)) {
       return res.status(400).json({
-        error: 'Machine already has a running data collection instance',
-        details: `Machine ${sshConfig.sshHost} already has a data collection instance running`
+        error: 'Machine already has a running data collection instance for this node',
+        details: `Machine ${sshConfig.sshHost} already has a data collection instance running for node ${nodeIndex}`
       });
     }
 
@@ -871,8 +875,12 @@ app.post('/api/data-collection/run', async (req, res) => {
 
     // Install required packages in smaller steps
     const installSteps = [
-      // Step 0: Check and remove apt locks
-      `sudo rm /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock*`,
+      // Step 0: Check and remove apt locks if they exist
+      `for lock in /var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock*; do
+        if [ -f "$lock" ]; then
+          sudo rm "$lock"
+        fi
+      done`,
       
       // Step 1: Update system
       `sudo apt update && sudo apt upgrade -y`,
@@ -906,6 +914,7 @@ MONGODB_URI=${mongodbUri}
 MONGODB_DATABASE=${mongodbDatabase}
 MONGODB_COLLECTION=${mongodbCollection}
 AUTO_RESTART=${autoRestart}
+NODE_INDEX=${nodeIndex}
 EOL
 
       # Display .env file contents for verification
@@ -944,6 +953,7 @@ try:
     
     # Test collection access
     collection = db['${mongodbCollection}']
+
     count = collection.count_documents({})
     print(f'Number of documents in collection: {count}')
     
@@ -973,11 +983,12 @@ except Exception as e:
       echo "MongoDB URI: ${mongodbUri}" >> "$logfile"
       echo "MongoDB Database: ${mongodbDatabase}" >> "$logfile"
       echo "MongoDB Collection: ${mongodbCollection}" >> "$logfile"
+      echo "Node Index: ${nodeIndex}" >> "$logfile"
       echo "Auto Restart: ${autoRestart}" >> "$logfile"
       echo "----------------------------------------" >> "$logfile"
 
       # Start the data collection with nohup and in background
-      nohup python3 collect_features.py > "$logfile" 2>&1 &
+      NODE_INDEX=${nodeIndex} nohup python3 collect_features.py > "$logfile" 2>&1 &
       echo $! > "$pidfile"
 
       # Wait a few seconds and check if the process is still running
@@ -1009,7 +1020,7 @@ except Exception as e:
     }
 
     // Add to running instances
-    const instance = addDataCollectionInstance(pid, sshConfig);
+    const instance = addDataCollectionInstance(pid, sshConfig, nodeIndex, tgenPublicIp);
 
     res.json({ 
       message: 'Data collection started successfully',
@@ -1048,7 +1059,7 @@ app.get('/api/data-collection/instances', (req, res) => {
 app.post('/api/data-collection/stop', async (req, res) => {
   let ssh = null;
   try {
-    const { pid, sshHost, sshUsername, sshPassword, sshKeyPath } = req.body;
+    const { pid, sshHost, sshUsername, sshPassword, sshKeyPath, nodeIndex } = req.body;
     
     // Validate required SSH credentials
     if (!sshHost || !sshUsername || (!sshPassword && !sshKeyPath)) {
@@ -1077,7 +1088,7 @@ app.post('/api/data-collection/stop', async (req, res) => {
     }
 
     // Remove from tracking first
-    removeDataCollectionInstance(sshHost);
+    removeDataCollectionInstance(sshHost, nodeIndex);
 
     if (pid) {
       const isRunning = await verifyProcess(sshConfig, pid);
@@ -1097,18 +1108,18 @@ app.post('/api/data-collection/stop', async (req, res) => {
         console.error('Error stopping process:', error);
       }
     } else {
-      // Kill all data collection processes
+      // Kill all data collection processes for this node
       try {
         // First try to kill by PID if provided
         if (pid) {
           await ssh.execCommand(`kill -9 ${pid}`);
         }
         
-        // Then kill any remaining collect_features.py processes
-        await ssh.execCommand('pkill -9 -f collect_features.py');
+        // Then kill any remaining collect_features.py processes for this node
+        await ssh.execCommand(`pkill -9 -f "NODE_INDEX=${nodeIndex}.*collect_features.py"`);
         
-        // Also kill any Python processes that might be running the script
-        await ssh.execCommand('pkill -f collect_features.py');
+        // Also kill any Python processes that might be running the script for this node
+        await ssh.execCommand(`pkill -f "NODE_INDEX=${nodeIndex}.*collect_features.py"`);
       } catch (error) {
         console.error('Error stopping all processes:', error);
       }
@@ -1125,8 +1136,8 @@ app.post('/api/data-collection/stop', async (req, res) => {
       ssh.dispose();
     }
     // Even if there's an error, try to remove from tracking
-    if (req.body.sshHost) {
-      removeDataCollectionInstance(req.body.sshHost);
+    if (req.body.sshHost && req.body.nodeIndex) {
+      removeDataCollectionInstance(req.body.sshHost, req.body.nodeIndex);
     }
     res.status(500).json({ 
       error: 'Failed to stop data collection',

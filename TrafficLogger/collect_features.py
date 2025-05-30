@@ -30,6 +30,7 @@ class FloodDetector:
         database = os.getenv('MONGODB_DATABASE', 'ddos_detection')
         conn_str = os.getenv('MONGODB_URI', f'mongodb://localhost:27017/{database}')
         collection = os.getenv('MONGODB_COLLECTION')
+        node_index = os.getenv('NODE_INDEX')
 
         print(f"Connecting to MongoDB: {conn_str}")
         self.client = MongoClient(conn_str, serverSelectionTimeoutMS=5000)
@@ -39,6 +40,8 @@ class FloodDetector:
         print("MongoDB connection successful")
         
         self.db = self.client[database]
+        if node_index and not collection.endswith(f"_tgen_{node_index}"):
+            collection = f"{collection}_tgen_{node_index}"
         self.collection = self.db[collection]
 
         self.last_features = {}  # Store the latest aggregated features
@@ -173,6 +176,10 @@ class FloodDetector:
             time.sleep(self.AGG_INTERVAL)  # Adjust sleep to account for the 1-second interval above
 
     def capture_packets(self):
+        # Get the interface name based on node_index
+        node_index = os.getenv('NODE_INDEX', '0')
+        interface = f"gre-tgen-{node_index}"
+        print(f"Starting packet capture on interface: {interface}")
 
         def process_packet(packet):
             try:
@@ -356,11 +363,12 @@ class FloodDetector:
                 self.log_error(f"Error in processing packets: {e}")
 
         try:
-            # Modified filter to include GRE packets (protocol 47)
-            sniff(filter="proto 47 or udp or tcp", prn=process_packet, store=0)
+            # Modified filter to include GRE packets (protocol 47) and use specific interface
+            sniff(filter="proto 47 or udp or tcp", prn=process_packet, store=0, iface=interface)
         
         except Exception as e:
-            self.log_error(f"Sniffing Error: {e}")
+            self.log_error(f"Sniffing Error on interface {interface}: {e}")
+            print(f"Sniffing Error on interface {interface}: {e}")
 
     def track_tcp_flags(self, packet, direction, flow_id = None):
         # Helper function to track TCP flags

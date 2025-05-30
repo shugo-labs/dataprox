@@ -1076,13 +1076,14 @@ app.post('/api/data-collection/stop', async (req, res) => {
       });
     }
 
+    // Remove from tracking first
+    removeDataCollectionInstance(sshHost);
+
     if (pid) {
       const isRunning = await verifyProcess(sshConfig, pid);
       if (!isRunning) {
-        // Process is not running, just remove from our tracking
-        removeDataCollectionInstance(sshHost);
         return res.json({ 
-          message: 'Process was not running, removed from tracking',
+          message: 'Data collection stopped successfully',
           stoppedPid: pid
         });
       }
@@ -1094,8 +1095,6 @@ app.post('/api/data-collection/stop', async (req, res) => {
         await ssh.execCommand(`kill -9 ${pid}`);
       } catch (error) {
         console.error('Error stopping process:', error);
-        // Even if there's an error, remove from tracking
-        removeDataCollectionInstance(sshHost);
       }
     } else {
       // Kill all data collection processes
@@ -1110,12 +1109,8 @@ app.post('/api/data-collection/stop', async (req, res) => {
         
         // Also kill any Python processes that might be running the script
         await ssh.execCommand('pkill -f collect_features.py');
-        // Clear all running instances for this machine
-        removeDataCollectionInstance(sshHost);
       } catch (error) {
         console.error('Error stopping all processes:', error);
-        // Even if there's an error, remove from tracking
-        removeDataCollectionInstance(sshHost);
       }
     }
     

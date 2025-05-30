@@ -60,6 +60,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
   const [runningInstances, setRunningInstances] = useState<RunningInstance[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
 
   // Add effect for auto-clearing success messages
   useEffect(() => {
@@ -84,9 +85,13 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
   // Add effect for fetching and verifying running instances
   useEffect(() => {
     fetchRunningInstances();
-    const interval = setInterval(fetchRunningInstances, 5000);
+    const interval = setInterval(() => {
+      if (!isStopping) {  // Only fetch if we're not in the middle of stopping
+        fetchRunningInstances();
+      }
+    }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isStopping]);
 
   const fetchRunningInstances = async () => {
     try {
@@ -151,15 +156,22 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         sshKeyPath: formData.sshKeyPath,
       });
 
-      setSuccess('Data collection instance stopped successfully!');
-      
-      // Refresh running instances
-      const instancesResponse = await fetch('/api/data-collection/instances');
-      const instancesData = await instancesResponse.json();
-      setRunningInstances(instancesData.instances);
+      if (response.data.message === 'Data collection stopped successfully') {
+        setSuccess('Data collection instance stopped successfully!');
+        // Fetch fresh instances list
+        const instancesResponse = await fetch('/api/data-collection/instances');
+        const instancesData = await instancesResponse.json();
+        setRunningInstances(instancesData.instances);
+      } else {
+        throw new Error('Failed to stop data collection instance');
+      }
     } catch (err: any) {
       setError(err.response?.data?.details || 'Failed to stop data collection instance. Please try again.');
       console.error('Error:', err);
+      // Refresh instances list on error
+      const instancesResponse = await fetch('/api/data-collection/instances');
+      const instancesData = await instancesResponse.json();
+      setRunningInstances(instancesData.instances);
     } finally {
       setStopping(false);
     }

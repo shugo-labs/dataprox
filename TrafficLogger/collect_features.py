@@ -40,8 +40,6 @@ class FloodDetector:
         print("MongoDB connection successful")
         
         self.db = self.client[database]
-        if node_index and not collection.endswith(f"_tgen_{node_index}"):
-            collection = f"{collection}_tgen_{node_index}"
         self.collection = self.db[collection]
 
         self.last_features = {}  # Store the latest aggregated features

@@ -517,7 +517,7 @@ async function ensureDataproxExists(ssh) {
     
     if (checkDir.code !== 0) {
       console.log('Cloning dataprox repository...');
-      const cloneResult = await ssh.execCommand('git clone https://github.com/borgg-dev/dataprox.git ~/dataprox');
+      const cloneResult = await ssh.execCommand('git clone https://github.com/shugo-labs/dataprox.git ~/dataprox');
       if (cloneResult.code !== 0) {
         throw new Error(`Failed to clone repository: ${cloneResult.stderr}`);
       }

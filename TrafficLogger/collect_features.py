@@ -15,6 +15,7 @@ import asyncio
 import websockets
 from pymongo import MongoClient
 from dotenv import load_dotenv
+import random
 
 class FloodDetector:
 
@@ -22,26 +23,19 @@ class FloodDetector:
     CONNECTIONS = set()  # Use a set to keep track of active WebSocket connections
 
     def __init__(self):
-
         # Load environment variables from .env file
         load_dotenv()
 
         # Retrieve individual parameters from the environment
-        username = os.getenv('MONGODB_USERNAME', '')
-        password = os.getenv('MONGODB_PASSWORD', '')
-        host = os.getenv('MONGODB_HOST', 'localhost')
         database = os.getenv('MONGODB_DATABASE', 'ddos_detection')
-        collection = os.getenv("MONGODB_COLLECTION")
+        conn_str = os.getenv('MONGODB_URI', f'mongodb://localhost:27017/{database}')
+        collection = os.getenv('MONGODB_COLLECTION')
+        traffic_gen_ip = os.getenv('MONGODB_TGEN_IP')  # Get traffic generator IP from env
 
-        # Construct connection string based on provided credentials
-        if username and password:
-            # With authentication
-            conn_str = f"mongodb://{username}:{password}@{host}/{database}"
-        else:
-            # Without authentication
-            conn_str = f"mongodb://{host}/{database}"
-            
-        print(f"Connecting to MongoDB: {host}")
+        if not traffic_gen_ip:
+            raise ValueError("MONGODB_TGEN_IP environment variable is required")
+
+        print(f"Connecting to MongoDB: {conn_str}")
         self.client = MongoClient(conn_str, serverSelectionTimeoutMS=5000)
         
         # Test connection
@@ -110,7 +104,6 @@ class FloodDetector:
         self.fd_util, self.io_wait, self.net_errors, self.load_avg = 0, 0, 0, 0
 
         self.last_packet_time, self.last_fwd_packet_time, self.last_bwd_packet_time = None, None, None  # Track last packet times
-
 
     def write_to_mongodb(self, features):
         try:
@@ -183,6 +176,10 @@ class FloodDetector:
             time.sleep(self.AGG_INTERVAL)  # Adjust sleep to account for the 1-second interval above
 
     def capture_packets(self):
+        # Get the interface name based on node_index
+        node_index = os.getenv('NODE_INDEX', '0')
+        interface = f"gre-tgen-{node_index}"
+        print(f"Starting packet capture on interface: {interface}")
 
         def process_packet(packet):
             try:
@@ -366,11 +363,12 @@ class FloodDetector:
                 self.log_error(f"Error in processing packets: {e}")
 
         try:
-            # Modified filter to include GRE packets (protocol 47)
-            sniff(filter="proto 47 or udp or tcp", prn=process_packet, store=0)
+            # Modified filter to include GRE packets (protocol 47) and use specific interface
+            sniff(filter="proto 47 or udp or tcp", prn=process_packet, store=0, iface=interface)
         
         except Exception as e:
-            self.log_error(f"Sniffing Error: {e}")
+            self.log_error(f"Sniffing Error on interface {interface}: {e}")
+            print(f"Sniffing Error on interface {interface}: {e}")
 
     def track_tcp_flags(self, packet, direction, flow_id = None):
         # Helper function to track TCP flags
@@ -887,3 +885,5 @@ if __name__ == "__main__":
     threading.Thread(target=detector.monitor_system_metrics, daemon=True).start()
     threading.Thread(target=detector.aggregate_features, daemon=True).start()
     threading.Thread(target=run_websocket_server, args=(detector,), daemon=True).start()
+
+    detector.capture_packets()

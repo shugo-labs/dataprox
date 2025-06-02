@@ -15,5 +15,22 @@
     "nodeIndex": 0,
     "tgenPublicIp": "172.234.63.26",
     "instanceKey": "172.234.63.93-0"
+  },
+  {
+    "pid": "2397456",
+    "startTime": "2025-06-02T12:48:02.949Z",
+    "sshConfig": {
+      "sshHost": "172.234.63.92",
+      "sshUsername": "root",
+      "sshPassword": "",
+      "sshKeyPath": "/home/borgg/.ssh/ovh",
+      "mongodbTgenIp": "10.0.0.3",
+      "sshHostPrivateIp": "10.0.0.2"
+    },
+    "status": "running",
+    "machineIp": "172.234.63.92",
+    "nodeIndex": 0,
+    "tgenPublicIp": "172.234.63.11",
+    "instanceKey": "172.234.63.92-0"
   }
 ]

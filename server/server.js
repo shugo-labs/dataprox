@@ -579,16 +579,6 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     // Make sure the script is executable
     console.log('Making script executable...');
     await ssh.execCommand('chmod +x ~/dataprox/TrafficGenerator/run_traffic.sh');
-
-    // Run run_gre_moat.py with sudo
-    console.log('Setting up GRE tunnel...');
-    const setupGreCommand = `cd ~/dataprox && sudo python3 run_gre_moat.py`;
-    const setupGreResult = await ssh.execCommand(setupGreCommand);
-    console.log('GRE setup result:', setupGreResult);
-
-    if (setupGreResult.code !== 0) {
-      throw new Error(`Failed to set up GRE tunnel: ${setupGreResult.stderr || setupGreResult.stdout}`);
-    }
     
     // Create a unique log file name
     const timestamp = Date.now();

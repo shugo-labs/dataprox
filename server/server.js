@@ -580,9 +580,9 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     console.log('Making script executable...');
     await ssh.execCommand('chmod +x ~/dataprox/TrafficGenerator/run_traffic.sh');
 
-    // Run setup_gre.py with sudo
+    // Run run_gre_moat.py with sudo
     console.log('Setting up GRE tunnel...');
-    const setupGreCommand = `cd ~/dataprox && sudo python3 setup_gre.py`;
+    const setupGreCommand = `cd ~/dataprox && sudo python3 run_gre_moat.py`;
     const setupGreResult = await ssh.execCommand(setupGreCommand);
     console.log('GRE setup result:', setupGreResult);
 
@@ -1029,9 +1029,9 @@ EOL
     const envResult = await ssh.execCommand(envCommand);
     console.log('ENV file creation result:', envResult);
 
-    // Run setup_gre.py with sudo
+    // Run run_gre_moat.py with sudo
     console.log('Setting up GRE tunnel...');
-    const setupGreCommand = `cd ~/dataprox && sudo python3 setup_gre.py`;
+    const setupGreCommand = `cd ~/dataprox && sudo python3 run_gre_moat.py`;
     const setupGreResult = await ssh.execCommand(setupGreCommand);
     console.log('GRE setup result:', setupGreResult);
 

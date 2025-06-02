@@ -29,7 +29,7 @@ class FloodDetector:
         # Retrieve individual parameters from the environment
         database = os.getenv('MONGODB_DATABASE', 'ddos_detection')
         conn_str = os.getenv('MONGODB_URI', f'mongodb://localhost:27017/{database}')
-        collection = os.getenv('MONGODB_COLLECTION')
+        collection = os.getenv('MONGODB_COLLECTION', 'traffic_features')
 
         print(f"Connecting to MongoDB: {conn_str}")
         self.client = MongoClient(conn_str, serverSelectionTimeoutMS=5000)

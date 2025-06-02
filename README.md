@@ -134,6 +134,38 @@ cd server && npm start
 - Monitor logs in real-time.
 - Use "Stop" to terminate the instance.
 
+### Supported Traffic Types
+
+The Traffic Generator supports a variety of traffic types, including:
+
+- **TCP Traffic**:
+  - SYN Floods
+  - Variable Window SYN Floods
+  - Adaptive Floods
+  - Batch Floods
+  - Randomized SYN Floods
+  - Variable TTL SYN Floods
+  - Targeted SYN Floods on Common Ports
+
+- **UDP Traffic**:
+  - Malformed Packet Floods
+  - Multi-Protocol Amplification Attacks
+  - Adaptive Payload Floods
+  - Compressed Encrypted Floods
+  - Max Randomized Floods
+  - Single IP Floods
+  - IP Packet Floods
+  - Reflection Attacks
+  - Memcached Amplification Attacks
+  - Hybrid Floods
+  - Dynamic Payload Floods
+  - Encrypted Payload Floods
+
+- **Mixed Traffic**:
+  - Combined UDP and TCP Floods
+
+Each traffic type is designed to simulate different network conditions and attack scenarios, providing a comprehensive framework for network testing and security assessments.
+
 ---
 
 ## Data Collection

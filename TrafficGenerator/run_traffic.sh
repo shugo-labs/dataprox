@@ -13,7 +13,7 @@ pip3 install --quiet faker scapy pycryptodome
 cd ~/dataprox && python3 gre_setup.py tgen $moat_private_ip $private_ip $interface $node_index
 
 # Step 2: Generate playlist
-python3 -c "
+cd ~/dataprox/TrafficGenerator && python3 -c "
 import json
 from generate_playlist import create_random_playlist
 
@@ -23,7 +23,7 @@ with open('/tmp/playlist.json', 'w') as f:
 "
 
 # Step 3: Read and loop over each item in playlist.json, one at a time
-python3 - <<EOF
+cd ~/dataprox/TrafficGenerator && python3 - <<EOF
 import json
 import subprocess
 import time
@@ -41,7 +41,7 @@ for entry in playlist:
 
     # Start the traffic generator process
     proc = subprocess.Popen(
-        ["python3", "~/dataprox/TrafficGenerator/traffic_generator_training.py", class_vector,
+        ["python3", "traffic_generator_training.py", class_vector,
         "--duration", str(duration),
         "--receiver-ips", "10.0.0.1",
         "--interface", f"ipip-tgen-${node_index}"],
@@ -58,7 +58,7 @@ for entry in playlist:
         try:
             os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
             proc.wait(timeout=5)
-            subprocess.run(["pkill", "-9", "-f", "/root/dataprox/TrafficGenerator/traffic_generator_training.py"])
+            subprocess.run(["pkill", "-9", "-f", "traffic_generator_training.py"])
             time.sleep(2)
         except subprocess.TimeoutExpired:
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)

@@ -90,15 +90,6 @@ npm install && npm run build
 
 ---
 
-## Configuration
-
-### Backend
-
-- Create a `.env` file in `server/` if you want to override the default port:
-  ```
-  PORT=3001
-  ```
-
 ### MongoDB
 
 - Ensure you have a running MongoDB instance.

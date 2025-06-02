@@ -75,6 +75,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
   const [runningInstances, setRunningInstances] = useState<RunningInstance[]>([]);
   const initialLoadDone = useRef(false);
   const userSelectedLog = useRef(false);
+  const [cleaning, setCleaning] = useState(false);
 
   useEffect(() => {
     // Fetch log files when component mounts
@@ -259,7 +260,8 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       const response = await axios.post('/api/traffic-generator/stop', {
         pid,
         sshHost: machineIp,
-        nodeIndex
+        nodeIndex,
+        cleanupFiles: true
       });
 
       setSuccess(`Traffic generator instance ${nodeIndex} stopped successfully!`);
@@ -282,11 +284,17 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
     setSuccess(null);
 
     try {
-      // Stop all traffic processes for the current machine
-      const stopResponse = await axios.post('/api/traffic-generator/stop', {
-        sshHost: formData.sshHost
-      });
+      // Stop all traffic processes for all machines
+      const stopPromises = runningInstances.map(instance => 
+        axios.post('/api/traffic-generator/stop', {
+          pid: instance.pid,
+          sshHost: instance.machineIp,
+          nodeIndex: instance.nodeIndex,
+          cleanupFiles: true
+        })
+      );
 
+      await Promise.all(stopPromises);
       setSuccess('All traffic processes stopped successfully!');
       
       // Refresh running instances
@@ -367,6 +375,24 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       console.error('Error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCleanup = async () => {
+    setCleaning(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await axios.post('/api/traffic-generator/cleanup');
+      setSuccess('Old traffic files cleaned up successfully!');
+      // Refresh log files after cleanup
+      fetchLogFiles();
+    } catch (err: any) {
+      setError(err.response?.data?.details || 'Failed to cleanup traffic files. Please try again.');
+      console.error('Error:', err);
+    } finally {
+      setCleaning(false);
     }
   };
 

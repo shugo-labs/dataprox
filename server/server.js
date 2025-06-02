@@ -683,7 +683,7 @@ app.get('/api/traffic-generator/instances', (req, res) => {
 app.post('/api/traffic-generator/stop', async (req, res) => {
   let ssh = null;
   try {
-    const { pid, nodeIndex, sshHost } = req.body;
+    const { pid, nodeIndex, sshHost, cleanupFiles, cleanupAllFiles } = req.body;
     
     // Find the instance in our tracking
     const instance = Array.from(runningInstances.values()).find(
@@ -751,6 +751,26 @@ app.post('/api/traffic-generator/stop', async (req, res) => {
       const checkResult = await ssh.execCommand(`ps -p ${pid},${allChildPids.join(',')} | grep -v TTY`);
       if (checkResult.stdout.trim().length === 0) {
         removeRunningInstance(nodeIndex, sshHost);
+        
+        // Cleanup files if requested
+        if (cleanupFiles) {
+          try {
+            // Find and remove the PID file
+            const pidFiles = await ssh.execCommand('ls /tmp/traffic_*.pid');
+            const pidFileList = pidFiles.stdout.split('\n').filter(Boolean);
+            for (const pidFile of pidFileList) {
+              const filePid = await ssh.execCommand(`cat ${pidFile}`);
+              if (filePid.stdout.trim() === pid) {
+                // Remove both PID and log files
+                await ssh.execCommand(`rm -f ${pidFile}`);
+                await ssh.execCommand(`rm -f ${pidFile.replace('.pid', '.log')}`);
+                break;
+              }
+            }
+          } catch (err) {
+            console.error('Error cleaning up files:', err);
+          }
+        }
       } else {
         // If any processes are still running, try pkill as a fallback
         await ssh.execCommand(`pkill -9 -P ${pid}`);
@@ -772,6 +792,15 @@ app.post('/api/traffic-generator/stop', async (req, res) => {
           }
         }
         saveRunningInstances();
+
+        // Cleanup all files if requested
+        if (cleanupAllFiles) {
+          try {
+            await ssh.execCommand('rm -f /tmp/traffic_*.pid /tmp/traffic_*.log /tmp/traffic_shaping.lock');
+          } catch (err) {
+            console.error('Error cleaning up all files:', err);
+          }
+        }
       } catch (error) {
         console.error('Error stopping all processes:', error);
         // Even if there's an error, remove from tracking
@@ -807,31 +836,53 @@ app.post('/api/traffic-generator/stop', async (req, res) => {
 
 // Cleanup endpoint for stopping tail process
 app.post('/api/traffic-generator/cleanup', async (req, res) => {
-  let ssh = null;
   try {
-    const { pid, sshHost, sshUsername, sshPassword, sshKeyPath } = req.body;
-    
-    ssh = await createSSHConnection({
-      sshHost,
-      sshUsername,
-      sshPassword,
-      sshKeyPath
-    });
-    
-    // Kill the tail process
-    await ssh.execCommand(`kill ${pid}`);
-    
-    ssh.dispose();
-    res.json({ message: 'Cleanup completed successfully' });
-  } catch (error) {
-    console.error('Cleanup Error:', error);
-    if (ssh) {
-      ssh.dispose();
+    // Get all running instances to check which PIDs are active
+    const runningInstances = getRunningInstances();
+    const activePids = new Set(runningInstances.map(instance => instance.pid));
+
+    // Find all traffic PID files
+    const pidFiles = await fs.readdir('/tmp');
+    const trafficPidFiles = pidFiles.filter(file => file.startsWith('traffic_') && file.endsWith('.pid'));
+
+    for (const pidFile of trafficPidFiles) {
+      const pidFilePath = path.join('/tmp', pidFile);
+      const logFile = pidFile.replace('.pid', '.log');
+      const logFilePath = path.join('/tmp', logFile);
+
+      try {
+        // Read PID from file
+        const pid = await fs.readFile(pidFilePath, 'utf8');
+        
+        // Check if process is running and not in active instances
+        if (!activePids.has(pid.trim())) {
+          // Remove both PID and log files
+          await fs.unlink(pidFilePath);
+          await fs.unlink(logFilePath).catch(() => {}); // Ignore if log file doesn't exist
+        }
+      } catch (err) {
+        console.error(`Error processing ${pidFile}:`, err);
+      }
     }
-    res.status(500).json({ error: 'Failed to cleanup processes' });
+
+    // Remove traffic_shaping.lock if it exists
+    const lockFile = path.join('/tmp', 'traffic_shaping.lock');
+    try {
+      await fs.unlink(lockFile);
+    } catch (err) {
+      // Ignore if file doesn't exist
+    }
+
+    res.json({ success: true, message: 'Cleanup completed successfully' });
+  } catch (err) {
+    console.error('Error during cleanup:', err);
+    res.status(500).json({ 
+      success: false, 
+      details: 'Failed to cleanup traffic files',
+      error: err.message 
+    });
   }
 });
-
 
 // Delete log file endpoint
 app.delete('/api/traffic-generator/logs/:filename', (req, res) => {

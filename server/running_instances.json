@@ -1,15 +1,15 @@
 [
   {
     "nodeIndex": 0,
-    "pid": "34350",
-    "startTime": "2025-06-02T13:45:58.682Z",
+    "pid": "53286",
+    "startTime": "2025-06-02T14:07:04.811Z",
     "status": "running",
     "machineIp": "172.234.63.11",
     "privateIp": "10.0.0.3",
     "moatPublicIp": "172.234.63.92",
     "moatPrivateIp": "10.0.0.2",
     "instanceKey": "172.234.63.11-0",
-    "totalDuration": 123455,
+    "totalDuration": 123456,
     "sshConfig": {
       "sshHost": "172.234.63.11",
       "sshUsername": "root",
@@ -24,8 +24,8 @@
   },
   {
     "nodeIndex": 0,
-    "pid": "2118229",
-    "startTime": "2025-06-02T13:49:20.520Z",
+    "pid": "2127722",
+    "startTime": "2025-06-02T14:11:48.568Z",
     "status": "running",
     "machineIp": "172.234.63.26",
     "privateIp": "10.0.0.4",

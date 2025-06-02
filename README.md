@@ -31,6 +31,9 @@ This repository is the **data collection codebase for Bittensor Subnet 91**. To 
 
 DataProx is a modern, production-grade open-source platform developed by Shugo Labs for orchestrating, monitoring, and managing distributed network traffic generation and feature collection. It provides a web dashboard and robust backend for launching, tracking, and cleaning up traffic generator and data collection jobs across multiple remote machines.
 
+![Traffic Generator Dashboard](./assets/traffic_generator_dashboard.png)
+![Data Collection Dashboard](./assets/data_collection_dashboard.png)
+
 ---
 
 ## Features

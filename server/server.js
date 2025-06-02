@@ -509,7 +509,29 @@ app.post('/api/data-collection/test-connection', async (req, res) => {
   }
 });
 
-// Traffic Generator endpoint
+// Add function to check and clone repository
+async function ensureDataproxExists(ssh) {
+  try {
+    // Check if dataprox directory exists
+    const checkDir = await ssh.execCommand('ls -la ~/dataprox');
+    
+    if (checkDir.code !== 0) {
+      console.log('Cloning dataprox repository...');
+      const cloneResult = await ssh.execCommand('git clone https://github.com/borgg-dev/dataprox.git ~/dataprox');
+      if (cloneResult.code !== 0) {
+        throw new Error(`Failed to clone repository: ${cloneResult.stderr}`);
+      }
+      console.log('Repository cloned successfully');
+    } else {
+      console.log('dataprox directory already exists');
+    }
+  } catch (error) {
+    console.error('Error checking/cloning repository:', error);
+    throw error;
+  }
+}
+
+// Update Traffic Generator endpoint
 app.post('/api/traffic-generator/run', async (req, res) => {
   let ssh = null;
   try {
@@ -545,18 +567,8 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     ssh = await createSSHConnection(sshConfig);
     console.log('SSH connection established');
     
-    // Check if TrafficGenerator directory exists
-    console.log('Checking TrafficGenerator directory...');
-    const checkDir = await ssh.execCommand('ls -la ~/dataprox/TrafficGenerator');
-    console.log('Directory check result:', checkDir.stdout);
-
-    if (checkDir.code !== 0) {
-      console.log('Cloning TrafficGenerator repository...');
-      const cloneResult = await ssh.execCommand('git clone https://github.com/borgg-dev/dataprox.git', {
-        cwd: '~/dataprox'
-      });
-      console.log('Clone result:', cloneResult.stdout, cloneResult.stderr);
-    }
+    // Ensure dataprox exists
+    await ensureDataproxExists(ssh);
     
     // Make sure the script is executable
     console.log('Making script executable...');
@@ -917,7 +929,7 @@ app.get('/api/traffic-generator/verify-instances', async (req, res) => {
   }
 });
 
-// Data Collection endpoint
+// Update Data Collection endpoint
 app.post('/api/data-collection/run', async (req, res) => {
   let ssh = null;
   try {
@@ -933,6 +945,9 @@ app.post('/api/data-collection/run', async (req, res) => {
 
     ssh = await createSSHConnection(sshConfig);
     
+    // Ensure dataprox exists
+    await ensureDataproxExists(ssh);
+
     // Create a unique log file name
     const timestamp = new Date().getTime();
     const logFileName = `data_collection_${timestamp}.log`;

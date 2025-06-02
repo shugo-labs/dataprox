@@ -368,7 +368,7 @@ class FloodDetector:
         
         except Exception as e:
             self.log_error(f"Sniffing Error: {e}")
-            print(f"Sniffing Error: {e}
+            print(f"Sniffing Error: {e}")
 
     def track_tcp_flags(self, packet, direction, flow_id = None):
         # Helper function to track TCP flags

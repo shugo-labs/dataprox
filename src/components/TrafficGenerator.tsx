@@ -73,6 +73,8 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
   const [wsConnected, setWsConnected] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [runningInstances, setRunningInstances] = useState<RunningInstance[]>([]);
+  const initialLoadDone = useRef(false);
+  const userSelectedLog = useRef(false);
 
   useEffect(() => {
     // Fetch log files when component mounts
@@ -182,9 +184,10 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         );
         setLogFiles(sortedFiles);
         
-        // Select the most recent file if none is selected
-        if (sortedFiles.length > 0 && !selectedLogFile) {
+        // Select the most recent file only on initial load or when user hasn't manually selected a file
+        if (sortedFiles.length > 0 && !selectedLogFile && (!initialLoadDone.current || !userSelectedLog.current)) {
           handleLogFileSelect(sortedFiles[0].name);
+          initialLoadDone.current = true;
         }
       } else {
         console.error('Invalid response format:', response.data);
@@ -199,6 +202,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
   const handleLogFileSelect = (fileName: string) => {
     setSelectedLogFile(fileName);
     setLogContent('');
+    userSelectedLog.current = true;
   };
 
   const handleDeleteLog = async (fileName: string) => {
@@ -328,6 +332,9 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       console.log('Run response:', response.data);
       
       setSuccess('Traffic generation started successfully!');
+      
+      // Reset user selection flag to allow selecting the new log file
+      userSelectedLog.current = false;
       
       // Refresh running instances
       const instancesResponse = await fetch('/api/traffic-generator/instances');

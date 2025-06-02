@@ -14,9 +14,7 @@
       "sshHost": "172.234.63.11",
       "sshUsername": "root",
       "sshPassword": "",
-      "sshKeyPath": "/home/borgg/.ssh/ovh",
-      "privateIp": "10.0.0.3",
-      "moatPrivateIp": "10.0.0.2"
+      "sshKeyPath": "/home/borgg/.ssh/ovh"
     },
     "sshUsername": "root",
     "sshPassword": "",

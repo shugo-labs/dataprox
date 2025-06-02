@@ -537,7 +537,7 @@ async function ensureDataproxExists(ssh) {
   }
 }
 
-// Update Traffic Generator endpoint
+// Traffic Generator endpoint
 app.post('/api/traffic-generator/run', async (req, res) => {
   let ssh = null;
   try {
@@ -579,6 +579,16 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     // Make sure the script is executable
     console.log('Making script executable...');
     await ssh.execCommand('chmod +x ~/dataprox/TrafficGenerator/run_traffic.sh');
+
+    // Run setup_gre.py with sudo
+    console.log('Setting up GRE tunnel...');
+    const setupGreCommand = `cd ~/dataprox && sudo python3 setup_gre.py`;
+    const setupGreResult = await ssh.execCommand(setupGreCommand);
+    console.log('GRE setup result:', setupGreResult);
+
+    if (setupGreResult.code !== 0) {
+      throw new Error(`Failed to set up GRE tunnel: ${setupGreResult.stderr || setupGreResult.stdout}`);
+    }
     
     // Create a unique log file name
     const timestamp = Date.now();
@@ -935,7 +945,7 @@ app.get('/api/traffic-generator/verify-instances', async (req, res) => {
   }
 });
 
-// Update Data Collection endpoint
+// Data Collection endpoint
 app.post('/api/data-collection/run', async (req, res) => {
   let ssh = null;
   try {
@@ -1021,7 +1031,7 @@ EOL
 
     // Run setup_gre.py with sudo
     console.log('Setting up GRE tunnel...');
-    const setupGreCommand = `cd ~/dataprox/TrafficLogger && sudo python3 setup_gre.py`;
+    const setupGreCommand = `cd ~/dataprox && sudo python3 setup_gre.py`;
     const setupGreResult = await ssh.execCommand(setupGreCommand);
     console.log('GRE setup result:', setupGreResult);
 

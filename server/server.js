@@ -523,7 +523,13 @@ async function ensureDataproxExists(ssh) {
       }
       console.log('Repository cloned successfully');
     } else {
-      console.log('dataprox directory already exists');
+      console.log('dataprox directory exists, pulling latest changes...');
+      // Pull latest changes
+      const pullResult = await ssh.execCommand('cd ~/dataprox && git pull');
+      if (pullResult.code !== 0) {
+        throw new Error(`Failed to pull latest changes: ${pullResult.stderr}`);
+      }
+      console.log('Latest changes pulled successfully');
     }
   } catch (error) {
     console.error('Error checking/cloning repository:', error);

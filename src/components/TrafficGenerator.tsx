@@ -549,17 +549,18 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       <Divider sx={{ my: 4 }} />
 
       <Typography variant="h6" sx={{ mb: 2, userSelect: 'none' }}>
-        Traffic Generator Configuration
+        Parameters
       </Typography>
       <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Network Interface"
+              label="Private Network Interface"
               name="interface"
               value={formData.interface}
               onChange={handleInputChange}
+              helperText="Private interface of the traffic generator machine (e.g., eth0)"
               required
             />
           </Grid>
@@ -570,6 +571,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
               name="moatPrivateIp"
               value={formData.moatPrivateIp}
               onChange={handleInputChange}
+              helperText="Private IP of the receiver machine (Moat)"
               required
             />
           </Grid>
@@ -580,6 +582,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
               name="moatPublicIp"
               value={formData.moatPublicIp}
               onChange={handleInputChange}
+              helperText="Public IP of the receiver machine (Moat)"
               required
             />
           </Grid>
@@ -590,6 +593,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
               name="privateIp"
               value={formData.privateIp}
               onChange={handleInputChange}
+              helperText="Private IP of the traffic generator machine"
               required
             />
           </Grid>

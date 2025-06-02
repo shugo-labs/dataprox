@@ -1,252 +1,205 @@
-<picture>
-    <source srcset="./assets/shugo_white.png" media="(prefers-color-scheme: dark)">
-    <source srcset="./assets/shugo_black.png" media="(prefers-color-scheme: light)">
-    <img src="./assets/shugo_black.png" alt="Shugo Logo">
-</picture>
+# DataProx: Distributed Traffic Generation & Data Collection Platform
 
-
-
-<div align="center">
-
-# **Δataprox: SN91** <!-- omit in toc -->
-[![Discord Chat](https://img.shields.io/discord/308323056592486420.svg)](https://discord.gg/bittensor)
-[![Creative Commons Badge](https://img.shields.io/badge/Creative%20Commons-ED592F?logo=creativecommons&logoColor=fff&style=for-the-badge)](https://creativecommons.org/licenses/by-nc/4.0/deed.en)
+DataProx is a modern, production-grade open-source platform developed Shugo Labs for orchestrating, monitoring, and managing distributed network traffic generation and feature collection. It provides a web dashboard and robust backend for launching, tracking, and cleaning up traffic generator and data collection jobs across multiple remote machines.
 
 ---
-
-### The Data Collection Framework built for Tensorprox <!-- omit in toc -->
-
-[Discord](https://discord.gg/bittensor) • [Taostats](https://taostats.io/) • [Linkedin](https://www.linkedin.com/company/105804417/admin/dashboard/) • [Twitter](https://x.com/shugoio)
-
-</div>
-
----
-
-This repository is the **data collection codebase for Bittensor Subnet 91**. To learn more about the Bittensor project and the underlying mechanics, [read here.](https://docs.bittensor.com/)
-
-<br/>
-<div align="left">
-
-# Overview
-
-Δataprox is a comprehensive data collection tool suite designed to provide a ready-to-use framework for data generation/collection which will be used to build DDoS protection models. 
-
-This repository provides infrastructure for:
-    -> Synthetic Attack Generation: Creating realistic traffic patterns for testing DDoS protection systems
-    -> Traffic Feature Collection: Capturing network traffic characteristics to feed ML/rule based detection models.
-
-It contains two primary components for traffic generation and traffic feature collection.
-
-# Repository Structure
-
-```
-data-collection/
-├── TrafficGenerator/          # Traffic generation component
-│   ├── traffic_generator_training.py
-│   ├── generate_playlist.py
-│   ├── gre_setup.py
-│   └── run_traffic.sh        # Main execution script
-├── TrafficLogger/            # Traffic logging and feature collection
-│   ├── collect_features.py
-│   └── run_data_collection.sh # Setup and execution script
-│── .env.example #MongoDB inputs
-└── README.md
-```
-
-# Components
-
-## Traffic Generator
-
-The TrafficGenerator component is designed to run on tgen (traffic generation) machines and simulate various network traffic patterns.
-
-**Key Features:**
-
-* GRE tunnel setup for network isolation  
-* Playlist-based traffic generation  
-* Configurable traffic patterns and duration  
-* Support for multiple network interfaces 
-
-**Dependencies:**
-
-- Python 3.10
-- faker
-- scapy
-- pycryptodome
-
-## Traffic Logger
-
-The TrafficLogger component captures network traffic features and stores them in a MongoDB database for analysis and model training.
-
-**Key Features:**
-
-* Real-time traffic feature extraction
-* MongoDB integration for data persistence
-* System monitoring capabilities
-* Process management with PM2
-
-**Dependencies:**
-
-- tcpdump, tshark
-- sysstat, ifstat, dstat, vnstat
-- snmpd
-- Python packages: scapy, pandas, numpy, psutil, websockets, asyncio, pymongo, python-dotenv
-- Node.js and PM2
-
-# Usage
-
-## TrafficGenerator Setup and Execution
-
-Run the traffic generator on tgen machines:
-
-```
-nohup bash run_traffic.sh <interface> <moat_private_ip> <private_ip> <node_index> <total_duration> > /tmp/run_traffic.log 2>&1 &
-```
-
-**Parameters:**
-
-- interface: Network interface to use
-- moat_private_ip: MOAT server private IP address
-- private_ip: Local machine private IP
-- node_index: Unique identifier for the tgen node
-- total_duration: Traffic generation duration in seconds
-
-**What it does:**
-
-* Installs required Python packages
-* Sets up GRE tunneling configuration
-* Generates a randomized traffic playlist
-* Starts traffic generation in background mode
-
-## TrafficLogger Setup and Execution
-
-### Environment Variables
-Create a .env file in the TrafficLogger directory with your MongoDB configuration
-
-```
-MONGODB_USERNAME=
-MONGODB_PASSWORD=
-MONGODB_HOST=
-MONGODB_DATABASE=
-MONGODB_COLLECTION=
-```
-
-### Set up traffic logging and feature collection:
-
-```
-./run_data_collection.sh
-```
-
-**What it does:**
-
-* Updates system packages and installs monitoring tools
-* Installs required Python dependencies
-* Configures system services (sysstat, snmpd)
-* Starts feature collection process using PM2
-
-### Data Output
-
-The TrafficLogger component captures and stores the following traffic features:
-
-* Packet statistics (count, size, timing)
-* Protocol distribution
-* Flow characteristics
-* System resource utilization
-* Network interface metrics
-
-Data is stored in MongoDB collections for easy querying and analysis.
-
-# Contribution
-
-We welcome contributions! Detailed guidelines will be published soon.
-
-# License
-
-Licensed under the **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)**.
-
-## Licensing Terms
-- Non-commercial use permitted
-- Commercial use restricted to mining/validating within TensorProx subnet
-- Commercial licensing requests: Contact **Shugo LTD**
-
-# Contact
-
-Join our [Discord](https://discord.gg/bittensor) for community support and discussions.
-
----
-
-**Disclaimer**: Tensorprox is an experimental DDoS mitigation network. Always conduct thorough testing in controlled environments.
-
-# Dataprox Dashboard
-
-A modern web interface for managing traffic generation and data collection in the Dataprox project.
 
 ## Features
 
-- Traffic Generator Control
-  - Configure and run traffic generation scripts
-  - Monitor traffic generation status
-  - View logs and output
+- **Traffic Generation**: Launch, monitor, and stop synthetic traffic jobs on remote hosts.
+- **Data Collection**: Start and manage feature collection jobs, storing results in MongoDB.
+- **Automatic GRE Tunnel Setup**: Ensures GRE tunnels are configured before any job.
+- **Real-Time Logs**: View logs for each job in the dashboard.
+- **Process Management**: Clean up orphaned jobs and files.
+- **Multi-Node Support**: Manage many remote machines from a single dashboard.
 
-- Data Collection Management
-  - Configure MongoDB connection settings
-  - Start/stop data collection
-  - Monitor collection status
-  - View collection logs
+---
+
+## Repository Structure
+
+```
+dataprox/
+├── server/                # Node.js/Express backend API
+├── src/                   # React frontend (client)
+├── TrafficGenerator/      # Traffic generation scripts (Python, Bash)
+│   ├── run_traffic.sh
+│   ├── traffic_generator_training.py
+│   └── generate_playlist.py
+├── TrafficLogger/         # Data collection scripts (Python)
+│   └── collect_features.py
+├── gre_setup.py           # Shared GRE tunnel setup logic (Python)
+├── run_gre_moat.py        # (Optional) GRE tunnel runner
+└── README.md
+```
+
+---
 
 ## Prerequisites
 
-- Node.js 16.x or later
-- npm 7.x or later
-- MongoDB instance for data collection
+- **Node.js** v16+ (for backend/frontend)
+- **Python** 3.8+ (on all remote machines)
+- **MongoDB** (for data collection)
+- **SSH** access (with password or key) to all remote machines
+- **sudo/root** privileges on remote machines (for GRE setup)
+
+---
 
 ## Installation
 
-1. Clone the repository:
+### 1. Clone the repository
+
 ```bash
-git clone <repository-url>
+git clone https://github.com/borgg-dev/dataprox.git
 cd dataprox
 ```
 
-2. Install frontend dependencies:
-```bash
-npm install
-```
+### 2. Install backend dependencies
 
-3. Install backend dependencies:
 ```bash
 cd server
 npm install
 ```
 
-## Running the Application
+### 3. Install frontend dependencies
 
-1. Start the backend server:
+```bash
+cd ../
+npm install
+```
+
+### 4. Build the frontend
+
+```bash
+npm run build
+```
+
+---
+
+## Configuration
+
+### Backend
+
+- Create a `.env` file in `server/` if you want to override the default port:
+  ```
+  PORT=3001
+  ```
+
+### MongoDB
+
+- Ensure you have a running MongoDB instance.
+- You will provide the connection string, database, and collection via the dashboard UI when starting a data collection job.
+
+### Remote Machines
+
+- No manual setup required! The backend will:
+  - Clone/update the dataprox repo on each remote machine.
+  - Install all required Python and system packages.
+  - Set up GRE tunnels as needed.
+
+---
+
+## Usage
+
+### 1. Start the backend server
+
 ```bash
 cd server
 npm start
 ```
 
-2. In a new terminal, start the frontend development server:
+### 2. Start the frontend (development mode)
+
 ```bash
 npm start
 ```
 
-The dashboard will be available at `http://localhost:3000`
+- The dashboard will be available at [http://localhost:3001](http://localhost:3001)
 
-## Development
+---
 
-- Frontend: React with TypeScript and Material-UI
-- Backend: Express.js
-- API endpoints:
-  - POST `/api/traffic-generator/run`: Start traffic generation
-  - POST `/api/data-collection/run`: Start data collection
+## Traffic Generation
 
-## Security Notes
+### How to Use
 
-- The dashboard requires proper authentication and authorization
-- MongoDB credentials are stored securely in environment variables
-- All API endpoints should be protected with appropriate middleware
+- Navigate to the Traffic Generator section in the dashboard.
+- Configure the following:
+  - SSH connection details (host, username, password/key)
+  - Private Network interface
+  - Total duration
+  - Moat IP addresses (public and private)
+  - Traffic generator Private IP address
+- Click "Start" to begin traffic generation.
+- Monitor logs in real-time.
+- Use "Stop" to terminate the instance.
+
+---
+
+## Data Collection
+
+### How to Use
+
+- Navigate to the Data Collection section in the dashboard.
+- Configure the following:
+  - SSH connection details
+  - Private Network interface of the receiver machine (Moat)
+  - Traffic generator IP addresses
+  - MongoDB connection string
+  - Database and collection names
+
+- Click "Start" to begin data collection.
+- Monitor logs in real-time.
+- Use "Stop" to terminate the instance.
+
+---
+
+## GRE Tunnel Setup
+
+- The GRE tunnel is set up automatically by the backend before any job starts.
+- The shared logic is in `gre_setup.py`.
+- The script reads all required variables from the `.env` file.
+
+---
+
+## Process Management & Cleanup
+
+- The dashboard allows you to stop individual or all jobs.
+- Orphaned log and PID files are cleaned up automatically.
+- You can also use the "Cleanup" button in the dashboard to remove stale files.
+
+---
+
+## Security
+
+- All SSH credentials are handled securely and never stored in plaintext.
+- Only the required environment variables are written to the remote `.env` file.
+- Root access is required only for GRE tunnel setup.
+
+---
+
+## Troubleshooting
+
+- **GRE tunnel setup fails**: Ensure the remote user has sudo privileges and the correct interface/IPs are provided.
+- **MongoDB connection fails**: Double-check your URI, database, and collection names.
+- **Traffic/data jobs not starting**: Check the logs in the dashboard for error messages.
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to your fork
+5. Open a Pull Request
+
+---
 
 ## License
 
-Licensed under the Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0).# dataprox
+Licensed under the Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0).
+
+---
+
+## Support
+
+For support, open an issue on GitHub or contact the maintainer.

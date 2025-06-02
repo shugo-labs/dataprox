@@ -1,1 +1,40 @@
-[]
+[
+  {
+    "nodeIndex": 0,
+    "pid": "2109199",
+    "startTime": "2025-06-02T12:38:05.124Z",
+    "status": "running",
+    "machineIp": "172.234.63.26",
+    "moatPublicIp": "172.234.63.93",
+    "instanceKey": "172.234.63.26-0",
+    "totalDuration": 1234,
+    "sshConfig": {
+      "sshHost": "172.234.63.26",
+      "sshUsername": "root",
+      "sshPassword": "",
+      "sshKeyPath": "/home/borgg/.ssh/ovh"
+    },
+    "sshUsername": "root",
+    "sshPassword": "",
+    "sshKeyPath": "/home/borgg/.ssh/ovh"
+  },
+  {
+    "nodeIndex": 0,
+    "pid": "21587",
+    "startTime": "2025-06-02T12:42:33.564Z",
+    "status": "running",
+    "machineIp": "172.234.63.11",
+    "moatPublicIp": "172.234.63.92",
+    "instanceKey": "172.234.63.11-0",
+    "totalDuration": 1234,
+    "sshConfig": {
+      "sshHost": "172.234.63.11",
+      "sshUsername": "root",
+      "sshPassword": "",
+      "sshKeyPath": "/home/borgg/.ssh/ovh"
+    },
+    "sshUsername": "root",
+    "sshPassword": "",
+    "sshKeyPath": "/home/borgg/.ssh/ovh"
+  }
+]

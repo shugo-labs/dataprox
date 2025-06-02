@@ -1,14 +1,14 @@
 [
   {
-    "pid": "587313",
-    "startTime": "2025-06-02T09:47:04.592Z",
+    "pid": "612139",
+    "startTime": "2025-06-02T12:41:48.518Z",
     "sshConfig": {
       "sshHost": "172.234.63.93",
       "sshUsername": "root",
       "sshPassword": "",
-      "sshKeyPath": "C:\\Users\\GP\\Downloads\\ovh",
+      "sshKeyPath": "/home/borgg/.ssh/ovh",
       "mongodbTgenIp": "10.0.0.4",
-      "sshHostPrivateIp": "10.0.0.5"
+      "sshHostPrivateIp": "10.0.0.5²"
     },
     "status": "running",
     "machineIp": "172.234.63.93",

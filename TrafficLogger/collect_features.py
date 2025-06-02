@@ -15,7 +15,6 @@ import asyncio
 import websockets
 from pymongo import MongoClient
 from dotenv import load_dotenv
-from TrafficGenerator.gre_setup import GRESetup
 import random
 
 class FloodDetector:

@@ -442,7 +442,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
       <Divider sx={{ my: 4 }} />
 
       <Typography variant="h6" sx={{ mb: 2, userSelect: 'none' }}>
-        GRE Setup
+        GRE Configuration
       </Typography>
       <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
         <Grid container spacing={2}>
@@ -494,7 +494,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
       </Paper>
 
       <Typography variant="h6" sx={{ mb: 2, userSelect: 'none' }}>
-        MongoDB Configuration
+        MongoDB Inputs
       </Typography>
       <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
         <Grid container spacing={2}>

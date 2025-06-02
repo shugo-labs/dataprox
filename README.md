@@ -1,4 +1,33 @@
-# DataProx: Distributed Traffic Generation & Data Collection Platform
+<picture>
+    <source srcset="./assets/shugo_white.png" media="(prefers-color-scheme: dark)">
+    <source srcset="./assets/shugo_black.png" media="(prefers-color-scheme: light)">
+    <img src="./assets/shugo_black.png" alt="Shugo Logo">
+</picture>
+
+
+
+<div align="center">
+
+# **Δataprox: SN91** <!-- omit in toc -->
+[![Discord Chat](https://img.shields.io/discord/308323056592486420.svg)](https://discord.gg/bittensor)
+[![Creative Commons Badge](https://img.shields.io/badge/Creative%20Commons-ED592F?logo=creativecommons&logoColor=fff&style=for-the-badge)](https://creativecommons.org/licenses/by-nc/4.0/deed.en)
+
+---
+
+### The Data Collection Framework built for Tensorprox <!-- omit in toc -->
+
+[Discord](https://discord.gg/bittensor) • [Taostats](https://taostats.io/) • [Linkedin](https://www.linkedin.com/company/105804417/admin/dashboard/) • [Twitter](https://x.com/shugoio)
+
+</div>
+
+---
+
+This repository is the **data collection codebase for Bittensor Subnet 91**. To learn more about the Bittensor project and the underlying mechanics, [read here.](https://docs.bittensor.com/)
+
+<br/>
+<div align="left">
+
+# Overview
 
 DataProx is a modern, production-grade open-source platform developed Shugo Labs for orchestrating, monitoring, and managing distributed network traffic generation and feature collection. It provides a web dashboard and robust backend for launching, tracking, and cleaning up traffic generator and data collection jobs across multiple remote machines.
 
@@ -53,24 +82,10 @@ git clone https://github.com/borgg-dev/dataprox.git
 cd dataprox
 ```
 
-### 2. Install backend dependencies
+### 2. Install dependencies & build the frontend
 
 ```bash
-cd server
-npm install
-```
-
-### 3. Install frontend dependencies
-
-```bash
-cd ../
-npm install
-```
-
-### 4. Build the frontend
-
-```bash
-npm run build
+npm install && npm run build
 ```
 
 ---
@@ -103,14 +118,7 @@ npm run build
 ### 1. Start the backend server
 
 ```bash
-cd server
-npm start
-```
-
-### 2. Start the frontend (development mode)
-
-```bash
-npm start
+cd server && npm start
 ```
 
 - The dashboard will be available at [http://localhost:3001](http://localhost:3001)

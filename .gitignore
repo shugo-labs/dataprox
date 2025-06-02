@@ -1,5 +1,6 @@
 # Dependencies
 /node_modules
+/server/node_modules
 /.pnp
 .pnp.js
 
@@ -52,4 +53,4 @@ Thumbs.db
 *.tmp
 *.temp
 *.pid
-*.bak 
+*.bak

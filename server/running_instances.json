@@ -1,13 +1,15 @@
 [
   {
     "nodeIndex": 0,
-    "pid": "23731",
-    "startTime": "2025-06-02T13:05:39.898Z",
+    "pid": "28267",
+    "startTime": "2025-06-02T13:35:56.911Z",
     "status": "running",
     "machineIp": "172.234.63.11",
+    "privateIp": "10.0.0.3",
     "moatPublicIp": "172.234.63.92",
+    "moatPrivateIp": "10.0.0.2",
     "instanceKey": "172.234.63.11-0",
-    "totalDuration": 1234563,
+    "totalDuration": 12345,
     "sshConfig": {
       "sshHost": "172.234.63.11",
       "sshUsername": "root",

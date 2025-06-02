@@ -31,6 +31,7 @@ interface RunningInstance {
   nodeIndex: number;
   tgenPrivateIp: string;
   tgenPublicIp: string;
+  moatPrivateIp: string;
 }
 
 interface LogFile {
@@ -55,6 +56,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
     nodeIndex: '0',
     tgenPublicIp: '',
     sshHostPrivateIp: '',
+    interface: '',
   });
   const [loading, setLoading] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -269,6 +271,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         nodeIndex: '0',
         tgenPublicIp: '',
         sshHostPrivateIp: '',
+        interface: '',
       });
     } catch (err: any) {
       setError(err.response?.data?.details || 'Failed to start data collection. Please try again.');
@@ -297,10 +300,10 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ userSelect: 'none' }}>Machine IP</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Moat Public IP</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Moat Private IP</TableCell>
                 <TableCell sx={{ userSelect: 'none' }}>PID</TableCell>
                 <TableCell sx={{ userSelect: 'none' }}>Start Time</TableCell>
-                <TableCell sx={{ userSelect: 'none' }}>Node Index</TableCell>
                 <TableCell sx={{ userSelect: 'none' }}>Tgen Private IP</TableCell>
                 <TableCell sx={{ userSelect: 'none' }}>Tgen Public IP</TableCell>
                 <TableCell sx={{ userSelect: 'none' }}>Actions</TableCell>
@@ -311,9 +314,9 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
                 runningInstances.map((instance) => (
                   <TableRow key={instance.instanceKey}>
                     <TableCell>{instance.machineIp}</TableCell>
+                    <TableCell>{instance.moatPrivateIp}</TableCell>
                     <TableCell>{instance.pid}</TableCell>
                     <TableCell>{new Date(instance.startTime).toLocaleString()}</TableCell>
-                    <TableCell>{instance.nodeIndex}</TableCell>
                     <TableCell>{instance.tgenPrivateIp}</TableCell>
                     <TableCell>{instance.tgenPublicIp}</TableCell>
                     <TableCell>
@@ -446,12 +449,23 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
+              label="Private Interface"
+              name="interface"
+              value={formData.interface}
+              onChange={handleInputChange}
+              required
+              helperText="Moat private network interface (e.g., eth0)"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
               label="Moat Private IP"
               name="sshHostPrivateIp"
               value={formData.sshHostPrivateIp}
               onChange={handleInputChange}
               required
-              helperText="Private IP of the SSH host"
+              helperText="Private IP of the receiver machine"
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -462,7 +476,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
               value={formData.tgenPublicIp}
               onChange={handleInputChange}
               required
-              helperText="Public IP of the traffic generator machine"
+              helperText="Public IP of the associated tgen machine"
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -473,7 +487,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
               value={formData.tgenPrivateIp}
               onChange={handleInputChange}
               required
-              helperText="Private IP of the traffic generator machine"
+              helperText="Private IP of the associated tgen machine"
             />
           </Grid>
         </Grid>

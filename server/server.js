@@ -80,7 +80,9 @@ function addRunningInstance(nodeIndex, pid, sshConfig, moatPublicIp, totalDurati
     startTime: new Date().toISOString(),
     status: 'running',
     machineIp: sshConfig.sshHost,
+    privateIp: sshConfig.privateIp,
     moatPublicIp: moatPublicIp,
+    moatPrivateIp: sshConfig.moatPrivateIp,
     instanceKey: instanceKey,
     totalDuration: parseInt(totalDuration),
     // Store SSH config for verification
@@ -206,7 +208,8 @@ function addDataCollectionInstance(pid, sshConfig, nodeIndex, tgenPublicIp) {
     machineIp: sshConfig.sshHost,
     nodeIndex: parseInt(nodeIndex),
     tgenPublicIp,
-    tgenPrivateIp: sshConfig.mongodbTgenIp, // Add the private IP from the form data
+    tgenPrivateIp: sshConfig.mongodbTgenIp,
+    moatPrivateIp: sshConfig.sshHostPrivateIp,
     instanceKey
   };
 
@@ -628,7 +631,11 @@ app.post('/api/traffic-generator/run', async (req, res) => {
     console.log('Process PID:', pid);
 
     // Add to running instances
-    const instance = addRunningInstance(nodeIndex, pid, sshConfig, moatPublicIp, totalDuration);
+    const instance = addRunningInstance(nodeIndex, pid, {
+      ...sshConfig,
+      privateIp: privateIp,
+      moatPrivateIp: moatPrivateIp
+    }, moatPublicIp, totalDuration);
 
     // Check if the process is running
     console.log('Checking if process is running...');
@@ -863,7 +870,7 @@ app.get('/api/traffic-generator/verify-instances', async (req, res) => {
 app.post('/api/data-collection/run', async (req, res) => {
   let ssh = null;
   try {
-    const { mongodbUri, mongodbDatabase, mongodbCollection, autoRestart, nodeIndex, tgenPublicIp, tgenPrivateIp, ...sshConfig } = req.body;
+    const { mongodbUri, mongodbDatabase, mongodbCollection, autoRestart, nodeIndex, tgenPublicIp, tgenPrivateIp, privateInterface, ...sshConfig } = req.body;
     
     // Check if this machine already has a running instance for this node
     if (isDataCollectionRunning(sshConfig.sshHost, nodeIndex)) {
@@ -1044,7 +1051,11 @@ except Exception as e:
     }
 
     // Add to running instances
-    const instance = addDataCollectionInstance(pid, { ...sshConfig, mongodbTgenIp: tgenPrivateIp }, nodeIndex, tgenPublicIp);
+    const instance = addDataCollectionInstance(pid, { 
+      ...sshConfig, 
+      mongodbTgenIp: tgenPrivateIp,
+      sshHostPrivateIp: sshConfig.sshHostPrivateIp 
+    }, nodeIndex, tgenPublicIp);
 
     res.json({ 
       message: 'Data collection started successfully',

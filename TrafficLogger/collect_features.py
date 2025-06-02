@@ -176,9 +176,6 @@ class FloodDetector:
 
     def capture_packets(self):
         # Get the interface name based on node_index
-        node_index = os.getenv('NODE_INDEX', '0')
-        interface = f"gre-tgen-{node_index}"
-        print(f"Starting packet capture on interface: {interface}")
 
         def process_packet(packet):
             try:
@@ -367,11 +364,11 @@ class FloodDetector:
 
         try:
             # Modified filter to include GRE packets (protocol 47) and use specific interface
-            sniff(filter="proto 47 or udp or tcp", prn=process_packet, store=0, iface=interface)
+            sniff(filter="proto 47 or udp or tcp", prn=process_packet, store=0)
         
         except Exception as e:
-            self.log_error(f"Sniffing Error on interface {interface}: {e}")
-            print(f"Sniffing Error on interface {interface}: {e}")
+            self.log_error(f"Sniffing Error: {e}")
+            print(f"Sniffing Error: {e}
 
     def track_tcp_flags(self, packet, direction, flow_id = None):
         # Helper function to track TCP flags

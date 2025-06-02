@@ -40,6 +40,8 @@ interface RunningInstance {
   status: string;
   machineIp: string;
   moatPublicIp: string;
+  moatPrivateIp: string;
+  privateIp: string;
   instanceKey: string;
   totalDuration: number;
 }
@@ -378,13 +380,13 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Tgen Public IP</TableCell>
-                <TableCell>Node Index</TableCell>
-                <TableCell>PID</TableCell>
-                <TableCell>Start Time</TableCell>
-                <TableCell>Duration</TableCell>
-                <TableCell>Moat Public IP</TableCell>
-                <TableCell>Actions</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Tgen Public IP</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Tgen Private IP</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>PID</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Start Time</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Moat Public IP</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Moat Private IP</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -392,11 +394,11 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
                 runningInstances.map((instance) => (
                   <TableRow key={instance.instanceKey}>
                     <TableCell>{instance.machineIp}</TableCell>
-                    <TableCell>{instance.nodeIndex}</TableCell>
+                    <TableCell>{instance.privateIp}</TableCell>
                     <TableCell>{instance.pid}</TableCell>
                     <TableCell>{new Date(instance.startTime).toLocaleString()}</TableCell>
-                    <TableCell>{instance.totalDuration || 0}s</TableCell>
                     <TableCell>{instance.moatPublicIp}</TableCell>
+                    <TableCell>{instance.moatPrivateIp}</TableCell>
                     <TableCell>
                       <Button
                         variant="contained"

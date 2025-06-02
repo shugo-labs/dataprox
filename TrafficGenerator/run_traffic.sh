@@ -10,7 +10,7 @@ total_duration=$5
 pip3 install --quiet faker scapy pycryptodome
 
 # Step 1: Run GRE setup
-python3 gre_setup.py tgen $moat_private_ip $private_ip $interface $node_index
+cd ~/dataprox && python3 gre_setup.py tgen $moat_private_ip $private_ip $interface $node_index
 
 # Step 2: Generate playlist
 python3 -c "
@@ -41,7 +41,7 @@ for entry in playlist:
 
     # Start the traffic generator process
     proc = subprocess.Popen(
-        ["python3", "/root/dataprox/TrafficGenerator/traffic_generator_training.py", class_vector,
+        ["python3", "~/dataprox/TrafficGenerator/traffic_generator_training.py", class_vector,
         "--duration", str(duration),
         "--receiver-ips", "10.0.0.1",
         "--interface", f"ipip-tgen-${node_index}"],

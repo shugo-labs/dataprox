@@ -15,6 +15,8 @@ import asyncio
 import websockets
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from TrafficGenerator.gre_setup import GRESetup
+import random
 
 class FloodDetector:
 
@@ -22,7 +24,6 @@ class FloodDetector:
     CONNECTIONS = set()  # Use a set to keep track of active WebSocket connections
 
     def __init__(self):
-
         # Load environment variables from .env file
         load_dotenv()
 
@@ -30,6 +31,13 @@ class FloodDetector:
         database = os.getenv('MONGODB_DATABASE', 'ddos_detection')
         conn_str = os.getenv('MONGODB_URI', f'mongodb://localhost:27017/{database}')
         collection = os.getenv('MONGODB_COLLECTION')
+        traffic_gen_ip = os.getenv('MONGODB_TGEN_IP')  # Get traffic generator IP from env
+        interface = os.getenv('INTERFACE')  # Get interface from env
+
+        if not traffic_gen_ip:
+            raise ValueError("MONGODB_TGEN_IP environment variable is required")
+        if not interface:
+            raise ValueError("INTERFACE environment variable is required")
 
         print(f"Connecting to MongoDB: {conn_str}")
         self.client = MongoClient(conn_str, serverSelectionTimeoutMS=5000)
@@ -100,7 +108,6 @@ class FloodDetector:
         self.fd_util, self.io_wait, self.net_errors, self.load_avg = 0, 0, 0, 0
 
         self.last_packet_time, self.last_fwd_packet_time, self.last_bwd_packet_time = None, None, None  # Track last packet times
-
 
     def write_to_mongodb(self, features):
         try:

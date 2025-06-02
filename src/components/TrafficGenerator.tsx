@@ -56,7 +56,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
     moatPrivateIp: '',
     moatPublicIp: '',
     privateIp: '',
-    nodeIndex: '',
+    nodeIndex: '0',
     totalDuration: '',
   });
   const [loading, setLoading] = useState(false);
@@ -245,26 +245,15 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
   };
 
   const handleStopInstance = async (pid: string, nodeIndex: number, machineIp: string) => {
-    // Check if we have the required SSH credentials
-    if (!formData.sshUsername || (!formData.sshPassword && !formData.sshKeyPath)) {
-      setError('SSH credentials are required to stop the instance. Please provide SSH username and either password or key path.');
-      return;
-    }
-
     setStopping(true);
     setError(null);
     setSuccess(null);
 
     try {
       const response = await axios.post('/api/traffic-generator/stop', {
+        pid,
         sshHost: machineIp,
-        sshUsername: formData.sshUsername,
-        sshPassword: formData.sshPassword,
-        sshKeyPath: formData.sshKeyPath,
-        commands: [
-          `pkill -P ${pid}`,  // Kill all child processes of the run_traffic.sh
-          `kill ${pid}`       // Kill the run_traffic.sh process itself
-        ]
+        nodeIndex
       });
 
       setSuccess(`Traffic generator instance ${nodeIndex} stopped successfully!`);
@@ -282,12 +271,6 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
   };
 
   const handleStop = async () => {
-    // Check if we have the required SSH credentials
-    if (!formData.sshHost || !formData.sshUsername || (!formData.sshPassword && !formData.sshKeyPath)) {
-      setError('SSH credentials are required to stop the instance. Please provide SSH host, username and either password or key path.');
-      return;
-    }
-
     setStopping(true);
     setError(null);
     setSuccess(null);
@@ -295,14 +278,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
     try {
       // Stop all traffic processes for the current machine
       const stopResponse = await axios.post('/api/traffic-generator/stop', {
-        sshHost: formData.sshHost,
-        sshUsername: formData.sshUsername,
-        sshPassword: formData.sshPassword,
-        sshKeyPath: formData.sshKeyPath,
-        commands: [
-          '/usr/bin/pkill -f "run_traffic.sh"',
-          '/usr/bin/pkill -f "python3"'
-        ]
+        sshHost: formData.sshHost
       });
 
       setSuccess('All traffic processes stopped successfully!');
@@ -322,21 +298,15 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if node index is already in use for the same receiver IP
-    const nodeIndexNum = parseInt(formData.nodeIndex);
-    const durationNum = parseInt(formData.totalDuration);
-    
-    if (runningInstances.some(instance => 
-      parseInt(instance.nodeIndex.toString()) === nodeIndexNum && 
-      instance.moatPublicIp === formData.moatPublicIp
-    )) {
-      setError(`Node index ${nodeIndexNum} is already in use for receiver IP ${formData.moatPublicIp}. Please choose a different node index.`);
-      return;
-    }
-
     // Check if this machine already has a running instance
     if (runningInstances.some(instance => instance.machineIp === formData.sshHost)) {
       setError(`Machine ${formData.sshHost} already has a running instance. Only one instance per machine is allowed.`);
+      return;
+    }
+
+    // Check if there's already an instance running towards this moat public IP
+    if (runningInstances.some(instance => instance.moatPublicIp === formData.moatPublicIp)) {
+      setError(`There is already a traffic generator instance running towards moat IP ${formData.moatPublicIp}. Only one instance per moat is allowed.`);
       return;
     }
 
@@ -348,7 +318,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       // Ensure totalDuration is sent as a number
       const submitData = {
         ...formData,
-        totalDuration: durationNum
+        totalDuration: parseInt(formData.totalDuration)
       };
       
       console.log('Submitting form data:', submitData);
@@ -365,7 +335,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       // Ensure duration is a number in the instances data
       const processedInstances = instancesData.instances.map((instance: any) => ({
         ...instance,
-        totalDuration: durationNum // Use the duration from the form
+        totalDuration: parseInt(formData.totalDuration) // Use the duration from the form
       }));
       
       setRunningInstances(processedInstances);
@@ -380,7 +350,7 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
         moatPrivateIp: '',
         moatPublicIp: '',
         privateIp: '',
-        nodeIndex: '',
+        nodeIndex: '0',  // Reset to '0'
         totalDuration: '',
       });
     } catch (err: any) {
@@ -408,12 +378,12 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Machine IP</TableCell>
+                <TableCell>Tgen Public IP</TableCell>
                 <TableCell>Node Index</TableCell>
                 <TableCell>PID</TableCell>
                 <TableCell>Start Time</TableCell>
                 <TableCell>Duration</TableCell>
-                <TableCell>Moat IP</TableCell>
+                <TableCell>Moat Public IP</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -544,14 +514,14 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
       <Divider sx={{ my: 4 }} />
 
       <Typography variant="h6" sx={{ mb: 2, userSelect: 'none' }}>
-        Parameters
+        Traffic Generator Configuration
       </Typography>
-      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540', userSelect: 'none' }}>
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Interface"
+              label="Network Interface"
               name="interface"
               value={formData.interface}
               onChange={handleInputChange}
@@ -576,7 +546,6 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
               value={formData.moatPublicIp}
               onChange={handleInputChange}
               required
-              helperText="Public IP of the receiver machine"
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -592,23 +561,12 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Node Index"
-              name="nodeIndex"
-              value={formData.nodeIndex}
-              onChange={handleInputChange}
-              required
-              type="number"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
               label="Total Duration (seconds)"
               name="totalDuration"
+              type="number"
               value={formData.totalDuration}
               onChange={handleInputChange}
               required
-              type="number"
             />
           </Grid>
         </Grid>
@@ -626,7 +584,6 @@ const TrafficGenerator: React.FC<TrafficGeneratorProps> = () => {
             !formData.moatPrivateIp || 
             !formData.moatPublicIp || 
             !formData.privateIp || 
-            !formData.nodeIndex || 
             !formData.totalDuration
           }
           sx={{

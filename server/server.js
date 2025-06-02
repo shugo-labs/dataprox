@@ -675,23 +675,22 @@ app.get('/api/traffic-generator/instances', (req, res) => {
 app.post('/api/traffic-generator/stop', async (req, res) => {
   let ssh = null;
   try {
-    const { pid, nodeIndex, sshHost, sshUsername, sshPassword, sshKeyPath } = req.body;
+    const { pid, nodeIndex, sshHost } = req.body;
     
-    // Validate required SSH credentials
-    if (!sshHost || !sshUsername || (!sshPassword && !sshKeyPath)) {
-      return res.status(400).json({
-        error: 'Missing required SSH credentials',
-        details: 'SSH host, username, and either password or key path are required to stop processes'
+    // Find the instance in our tracking
+    const instance = Array.from(runningInstances.values()).find(
+      inst => inst.machineIp === sshHost && (!pid || inst.pid === pid)
+    );
+
+    if (!instance) {
+      return res.status(404).json({
+        error: 'No running instance found',
+        details: `No traffic generator instance is running on machine ${sshHost}`
       });
     }
 
-    // First verify if the process is still running
-    const sshConfig = {
-      sshHost,
-      sshUsername,
-      sshPassword,
-      sshKeyPath
-    };
+    // Use stored SSH config from the instance
+    const sshConfig = instance.sshConfig;
 
     // Test SSH connection before proceeding
     try {
@@ -700,54 +699,64 @@ app.post('/api/traffic-generator/stop', async (req, res) => {
     } catch (error) {
       return res.status(401).json({
         error: 'Failed to establish SSH connection',
-        details: 'Invalid SSH credentials or connection failed'
+        details: 'Connection failed'
       });
     }
 
     if (pid) {
-      const isRunning = await verifyProcess(sshConfig, pid);
-      if (!isRunning) {
-        // Process is not running, just remove from our tracking
-        if (nodeIndex) {
-          removeRunningInstance(nodeIndex, sshHost);
+      // First get all child PIDs recursively
+      const getAllChildPids = async (parentPid) => {
+        const result = await ssh.execCommand(`ps --ppid ${parentPid} -o pid=`);
+        const childPids = result.stdout.trim().split('\n').filter(Boolean);
+        let allChildPids = [...childPids];
+        
+        // Recursively get children of children
+        for (const childPid of childPids) {
+          const grandChildPids = await getAllChildPids(childPid);
+          allChildPids = [...allChildPids, ...grandChildPids];
         }
-        return res.json({ 
-          message: 'Process was not running, removed from tracking',
-          stoppedPid: pid
-        });
+        
+        return allChildPids;
+      };
+
+      // Get all child PIDs recursively
+      const allChildPids = await getAllChildPids(pid);
+      console.log('Found child PIDs:', allChildPids);
+      
+      // Kill all child processes first
+      for (const childPid of allChildPids) {
+        try {
+          await ssh.execCommand(`kill -9 ${childPid}`);
+        } catch (error) {
+          console.error(`Error killing child process ${childPid}:`, error);
+        }
       }
-    }
-    
-    if (pid) {
-      // Stop specific process by PID
+      
+      // Then kill the parent process
       try {
-        await ssh.execCommand(`kill ${pid}`);
-        // Verify the process was stopped
-        const checkResult = await ssh.execCommand(`ps -p ${pid} | grep -v TTY`);
-        if (checkResult.stdout.trim().length === 0) {
-          // Process was successfully stopped
-          if (nodeIndex) {
-            removeRunningInstance(nodeIndex, sshHost);
-          }
-        } else {
-          // Process is still running, try force kill
-          await ssh.execCommand(`kill -9 ${pid}`);
-          if (nodeIndex) {
-            removeRunningInstance(nodeIndex, sshHost);
-          }
-        }
+        await ssh.execCommand(`kill -9 ${pid}`);
       } catch (error) {
-        console.error('Error stopping process:', error);
-        // Even if there's an error, remove from tracking
-        if (nodeIndex) {
-          removeRunningInstance(nodeIndex, sshHost);
-        }
+        console.error(`Error killing parent process ${pid}:`, error);
+      }
+      
+      // Verify all processes are stopped
+      const checkResult = await ssh.execCommand(`ps -p ${pid},${allChildPids.join(',')} | grep -v TTY`);
+      if (checkResult.stdout.trim().length === 0) {
+        removeRunningInstance(nodeIndex, sshHost);
+      } else {
+        // If any processes are still running, try pkill as a fallback
+        await ssh.execCommand(`pkill -9 -P ${pid}`);
+        // Also kill any remaining Python processes that might be related
+        await ssh.execCommand(`pkill -9 -f traffic_generator_training.py`);
+        removeRunningInstance(nodeIndex, sshHost);
       }
     } else {
       // Kill all traffic generator processes
       try {
-        await ssh.execCommand('pkill -f run_traffic.sh');
-        await ssh.execCommand('pkill -f python3');
+        // First kill all run_traffic.sh processes and their children
+        await ssh.execCommand('pkill -9 -f run_traffic.sh');
+        // Then kill any remaining Python processes
+        await ssh.execCommand('pkill -9 -f traffic_generator_training.py');
         // Clear all running instances for this machine
         for (const [key, instance] of runningInstances.entries()) {
           if (instance.machineIp === sshHost) {
@@ -814,6 +823,7 @@ app.post('/api/traffic-generator/cleanup', async (req, res) => {
     res.status(500).json({ error: 'Failed to cleanup processes' });
   }
 });
+
 
 // Delete log file endpoint
 app.delete('/api/traffic-generator/logs/:filename', (req, res) => {
@@ -913,6 +923,9 @@ app.post('/api/data-collection/run', async (req, res) => {
 MONGODB_URI=${mongodbUri}
 MONGODB_DATABASE=${mongodbDatabase}
 MONGODB_COLLECTION=${mongodbCollection}
+MONGODB_TGEN_IP=${sshConfig.mongodbTgenIp}
+INTERFACE=${sshConfig.interface}
+SSH_HOST_PRIVATE_IP=${sshConfig.sshHostPrivateIp}
 AUTO_RESTART=${autoRestart}
 NODE_INDEX=${nodeIndex}
 EOL
@@ -925,6 +938,16 @@ EOL
     console.log('Creating .env file...');
     const envResult = await ssh.execCommand(envCommand);
     console.log('ENV file creation result:', envResult);
+
+    // Run setup_gre.py with sudo
+    console.log('Setting up GRE tunnel...');
+    const setupGreCommand = `cd ~/dataprox/TrafficLogger && sudo python3 setup_gre.py`;
+    const setupGreResult = await ssh.execCommand(setupGreCommand);
+    console.log('GRE setup result:', setupGreResult);
+
+    if (setupGreResult.code !== 0) {
+      throw new Error(`Failed to set up GRE tunnel: ${setupGreResult.stderr || setupGreResult.stdout}`);
+    }
 
     // Test MongoDB connection with more detailed error handling
     const mongoTestCommand = `python3 -c "
@@ -1059,22 +1082,24 @@ app.get('/api/data-collection/instances', (req, res) => {
 app.post('/api/data-collection/stop', async (req, res) => {
   let ssh = null;
   try {
-    const { pid, sshHost, sshUsername, sshPassword, sshKeyPath, nodeIndex } = req.body;
+    const { pid, sshHost, nodeIndex } = req.body;
     
-    // Validate required SSH credentials
-    if (!sshHost || !sshUsername || (!sshPassword && !sshKeyPath)) {
-      return res.status(400).json({
-        error: 'Missing required SSH credentials',
-        details: 'SSH host, username, and either password or key path are required to stop processes'
+    // Find the instance in our tracking
+    const instance = Array.from(runningDataCollection.values()).find(
+      inst => inst.machineIp === sshHost && 
+             inst.nodeIndex === parseInt(nodeIndex) && 
+             (!pid || inst.pid === pid)
+    );
+
+    if (!instance) {
+      return res.status(404).json({
+        error: 'No running instance found',
+        details: `No data collection instance is running on machine ${sshHost} for node ${nodeIndex}`
       });
     }
 
-    const sshConfig = {
-      sshHost,
-      sshUsername,
-      sshPassword,
-      sshKeyPath
-    };
+    // Use stored SSH config from the instance
+    const sshConfig = instance.sshConfig;
 
     // Test SSH connection before proceeding
     try {
@@ -1083,45 +1108,70 @@ app.post('/api/data-collection/stop', async (req, res) => {
     } catch (error) {
       return res.status(401).json({
         error: 'Failed to establish SSH connection',
-        details: 'Invalid SSH credentials or connection failed'
+        details: 'Connection failed'
       });
     }
 
-    // Remove from tracking first
-    removeDataCollectionInstance(sshHost, nodeIndex);
+    if (pid) {
+      // First get all child PIDs recursively
+      const getAllChildPids = async (parentPid) => {
+        const result = await ssh.execCommand(`ps --ppid ${parentPid} -o pid=`);
+        const childPids = result.stdout.trim().split('\n').filter(Boolean);
+        let allChildPids = [...childPids];
+        
+        // Recursively get children of children
+        for (const childPid of childPids) {
+          const grandChildPids = await getAllChildPids(childPid);
+          allChildPids = [...allChildPids, ...grandChildPids];
+        }
+        
+        return allChildPids;
+      };
 
-    if (pid) {
-      const isRunning = await verifyProcess(sshConfig, pid);
-      if (!isRunning) {
-        return res.json({ 
-          message: 'Data collection stopped successfully',
-          stoppedPid: pid
-        });
+      // Get all child PIDs recursively
+      const allChildPids = await getAllChildPids(pid);
+      console.log('Found child PIDs:', allChildPids);
+      
+      // Kill all child processes first
+      for (const childPid of allChildPids) {
+        try {
+          await ssh.execCommand(`kill -9 ${childPid}`);
+        } catch (error) {
+          console.error(`Error killing child process ${childPid}:`, error);
+        }
       }
-    }
-    
-    if (pid) {
-      // Stop specific process by PID
+      
+      // Then kill the parent process
       try {
         await ssh.execCommand(`kill -9 ${pid}`);
       } catch (error) {
-        console.error('Error stopping process:', error);
+        console.error(`Error killing parent process ${pid}:`, error);
+      }
+      
+      // Verify all processes are stopped
+      const checkResult = await ssh.execCommand(`ps -p ${pid},${allChildPids.join(',')} | grep -v TTY`);
+      if (checkResult.stdout.trim().length === 0) {
+        removeDataCollectionInstance(sshHost, nodeIndex);
+      } else {
+        // If any processes are still running, try pkill as a fallback
+        await ssh.execCommand(`pkill -9 -P ${pid}`);
+        // Also kill any remaining Python processes that might be related
+        await ssh.execCommand(`pkill -9 -f collect_features.py`);
+        removeDataCollectionInstance(sshHost, nodeIndex);
       }
     } else {
       // Kill all data collection processes for this node
       try {
-        // First try to kill by PID if provided
-        if (pid) {
-          await ssh.execCommand(`kill -9 ${pid}`);
-        }
-        
-        // Then kill any remaining collect_features.py processes for this node
+        // First kill all collect_features.py processes and their children
         await ssh.execCommand(`pkill -9 -f "NODE_INDEX=${nodeIndex}.*collect_features.py"`);
-        
-        // Also kill any Python processes that might be running the script for this node
-        await ssh.execCommand(`pkill -f "NODE_INDEX=${nodeIndex}.*collect_features.py"`);
+        // Then kill any remaining Python processes for this node
+        await ssh.execCommand(`pkill -9 -f "python3.*collect_features.py"`);
+        // Remove from tracking
+        removeDataCollectionInstance(sshHost, nodeIndex);
       } catch (error) {
         console.error('Error stopping all processes:', error);
+        // Even if there's an error, remove from tracking
+        removeDataCollectionInstance(sshHost, nodeIndex);
       }
     }
     

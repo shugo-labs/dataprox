@@ -29,6 +29,7 @@ interface RunningInstance {
   machineIp: string;
   instanceKey: string;
   nodeIndex: number;
+  tgenPrivateIp: string;
   tgenPublicIp: string;
 }
 
@@ -49,9 +50,11 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
     mongodbUri: '',
     mongodbDatabase: '',
     mongodbCollection: '',
+    mongodbTgenIp: '',
     autoRestart: true,
-    nodeIndex: '',
+    nodeIndex: '0',
     tgenPublicIp: '',
+    sshHostPrivateIp: '',
   });
   const [loading, setLoading] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -138,12 +141,6 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
   };
 
   const handleStopInstance = async (pid: string, machineIp: string, nodeIndex: number) => {
-    // Check if we have the required SSH credentials
-    if (!formData.sshUsername || (!formData.sshPassword && !formData.sshKeyPath)) {
-      setError('SSH credentials are required to stop the instance. Please provide SSH username and either password or key path.');
-      return;
-    }
-
     setStoppingInstance(`${machineIp}-${nodeIndex}`);
     setError(null);
     setSuccess(null);
@@ -152,9 +149,6 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
       const response = await axios.post('/api/data-collection/stop', {
         pid,
         sshHost: machineIp,
-        sshUsername: formData.sshUsername,
-        sshPassword: formData.sshPassword,
-        sshKeyPath: formData.sshKeyPath,
         nodeIndex
       });
 
@@ -196,9 +190,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         axios.post('/api/data-collection/stop', {
           pid: instance.pid,
           sshHost: instance.machineIp,
-          sshUsername: formData.sshUsername,
-          sshPassword: formData.sshPassword,
-          sshKeyPath: formData.sshKeyPath,
+          nodeIndex: instance.nodeIndex
         })
       );
 
@@ -218,22 +210,13 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
   };
 
   const handleStopMachine = async (machineIp: string) => {
-    // Check if we have the required SSH credentials
-    if (!formData.sshUsername || (!formData.sshPassword && !formData.sshKeyPath)) {
-      setError('SSH credentials are required to stop the instance. Please provide SSH username and either password or key path.');
-      return;
-    }
-
     setStopping(true);
     setError(null);
     setSuccess(null);
 
     try {
       const response = await axios.post('/api/data-collection/stop', {
-        sshHost: machineIp,
-        sshUsername: formData.sshUsername,
-        sshPassword: formData.sshPassword,
-        sshKeyPath: formData.sshKeyPath,
+        sshHost: machineIp
       });
 
       setSuccess(`Data collection stopped successfully on ${machineIp}!`);
@@ -253,15 +236,6 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if node index is already in use
-    const nodeIndexNum = parseInt(formData.nodeIndex);
-    if (runningInstances.some(instance => 
-      parseInt(instance.nodeIndex.toString()) === nodeIndexNum
-    )) {
-      setError(`Node index ${nodeIndexNum} is already in use. Please choose a different node index.`);
-      return;
-    }
-
     // Check if this machine already has a running instance
     if (runningInstances.some(instance => instance.machineIp === formData.sshHost)) {
       setError(`Machine ${formData.sshHost} already has a running instance. Only one instance per machine is allowed.`);
@@ -290,9 +264,11 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         mongodbUri: '',
         mongodbDatabase: '',
         mongodbCollection: '',
+        mongodbTgenIp: '',
         autoRestart: true,
-        nodeIndex: '',
-        tgenPublicIp: ''
+        nodeIndex: '0',
+        tgenPublicIp: '',
+        sshHostPrivateIp: '',
       });
     } catch (err: any) {
       setError(err.response?.data?.details || 'Failed to start data collection. Please try again.');
@@ -325,6 +301,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
                 <TableCell sx={{ userSelect: 'none' }}>PID</TableCell>
                 <TableCell sx={{ userSelect: 'none' }}>Start Time</TableCell>
                 <TableCell sx={{ userSelect: 'none' }}>Node Index</TableCell>
+                <TableCell sx={{ userSelect: 'none' }}>Tgen Private IP</TableCell>
                 <TableCell sx={{ userSelect: 'none' }}>Tgen Public IP</TableCell>
                 <TableCell sx={{ userSelect: 'none' }}>Actions</TableCell>
               </TableRow>
@@ -337,6 +314,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
                     <TableCell>{instance.pid}</TableCell>
                     <TableCell>{new Date(instance.startTime).toLocaleString()}</TableCell>
                     <TableCell>{instance.nodeIndex}</TableCell>
+                    <TableCell>{instance.tgenPrivateIp}</TableCell>
                     <TableCell>{instance.tgenPublicIp}</TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 1 }}>
@@ -356,7 +334,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     No running instances
                   </TableCell>
                 </TableRow>
@@ -461,6 +439,47 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
       <Divider sx={{ my: 4 }} />
 
       <Typography variant="h6" sx={{ mb: 2, userSelect: 'none' }}>
+        GRE Setup
+      </Typography>
+      <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Moat Private IP"
+              name="sshHostPrivateIp"
+              value={formData.sshHostPrivateIp}
+              onChange={handleInputChange}
+              required
+              helperText="Private IP of the SSH host"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Tgen Public IP"
+              name="tgenPublicIp"
+              value={formData.tgenPublicIp}
+              onChange={handleInputChange}
+              required
+              helperText="Public IP of the traffic generator machine"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Tgen Private IP"
+              name="mongodbTgenIp"
+              value={formData.mongodbTgenIp}
+              onChange={handleInputChange}
+              required
+              helperText="Private IP of the traffic generator machine"
+            />
+          </Grid>
+        </Grid>
+      </Paper>
+
+      <Typography variant="h6" sx={{ mb: 2, userSelect: 'none' }}>
         MongoDB Configuration
       </Typography>
       <Paper sx={{ p: 2, mb: 3, bgcolor: '#252540' }}>
@@ -493,27 +512,6 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
               value={formData.mongodbCollection}
               onChange={handleInputChange}
               required
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Node Index"
-              name="nodeIndex"
-              value={formData.nodeIndex}
-              onChange={handleInputChange}
-              required
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Tgen Public IP"
-              name="tgenPublicIp"
-              value={formData.tgenPublicIp}
-              onChange={handleInputChange}
-              required
-              helperText="Public IP of the traffic generator associated with this node"
             />
           </Grid>
         </Grid>

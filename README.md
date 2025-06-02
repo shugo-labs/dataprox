@@ -112,7 +112,7 @@ npm install && npm run build
 ### 1. Start the backend server
 
 ```bash
-cd server && npm start
+cd server && npm install && npm start
 ```
 
 - The dashboard will be available at [http://localhost:3001](http://localhost:3001)

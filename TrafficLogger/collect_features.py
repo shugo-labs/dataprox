@@ -15,7 +15,6 @@ import asyncio
 import websockets
 from pymongo import MongoClient
 from dotenv import load_dotenv
-import random
 
 class FloodDetector:
 
@@ -23,6 +22,7 @@ class FloodDetector:
     CONNECTIONS = set()  # Use a set to keep track of active WebSocket connections
 
     def __init__(self):
+
         # Load environment variables from .env file
         load_dotenv()
 
@@ -30,10 +30,6 @@ class FloodDetector:
         database = os.getenv('MONGODB_DATABASE', 'ddos_detection')
         conn_str = os.getenv('MONGODB_URI', f'mongodb://localhost:27017/{database}')
         collection = os.getenv('MONGODB_COLLECTION')
-        traffic_gen_ip = os.getenv('MONGODB_TGEN_IP')  # Get traffic generator IP from env
-
-        if not traffic_gen_ip:
-            raise ValueError("MONGODB_TGEN_IP environment variable is required")
 
         print(f"Connecting to MongoDB: {conn_str}")
         self.client = MongoClient(conn_str, serverSelectionTimeoutMS=5000)
@@ -47,7 +43,7 @@ class FloodDetector:
 
         self.last_features = {}  # Store the latest aggregated features
         self.local_ip = self.get_local_ip()  # Automatically get the local IP address
-        self.protocol = ""
+        self.protocol = None  # Most common protocol in the current interval
         
         # Packet Variables Initialization
         self.fwd_packet_count, self.bwd_packet_count = 0, 0
@@ -104,6 +100,9 @@ class FloodDetector:
         self.fd_util, self.io_wait, self.net_errors, self.load_avg = 0, 0, 0, 0
 
         self.last_packet_time, self.last_fwd_packet_time, self.last_bwd_packet_time = None, None, None  # Track last packet times
+
+        # Initialize protocol tracking
+        self.protocols = []  # List to track protocols in the current interval
 
     def write_to_mongodb(self, features):
         try:
@@ -184,7 +183,6 @@ class FloodDetector:
         def process_packet(packet):
             try:
                 if packet.haslayer(IP):
-
                     current_time = packet.time
                     header_size = len(packet[IP])
                     packet_size = len(packet)
@@ -196,10 +194,11 @@ class FloodDetector:
                     self.gre_dest_ips.append(dst_ip)
 
                     flow_id = None
+                    packet_protocol = None  # Track protocol for this specific packet
 
                     # Handle GRE packets
                     if packet.haslayer(GRE):
-                        self.protocol = "GRE"
+                        packet_protocol = "GRE"
                         header_size += len(packet[GRE])
                         
                         # Extract GRE header information
@@ -263,7 +262,7 @@ class FloodDetector:
                                     self.gre_tunneled_protocols.append("OTHER")
 
                     elif packet.haslayer(UDP):
-                        self.protocol = "UDP"
+                        packet_protocol = "UDP"
                         header_size += len(packet[UDP])
                         self.udp_source_ports.append(packet[UDP].sport)
                         self.udp_dest_ports.append(packet[UDP].dport)
@@ -274,7 +273,7 @@ class FloodDetector:
                             self.proto_anomalies += 1
 
                     elif packet.haslayer(TCP):
-                        self.protocol = "TCP"
+                        packet_protocol = "TCP"
                         header_size += len(packet[TCP])
                         self.tcp_source_ports.append(packet[TCP].sport)
                         self.tcp_dest_ports.append(packet[TCP].dport)
@@ -358,6 +357,10 @@ class FloodDetector:
                                 label = keyword
                                 break
                     self.labels.append(label)
+
+                    # Add the protocol to our tracking list if we identified one
+                    if packet_protocol:
+                        self.protocols.append(packet_protocol)
 
             except Exception as e:
                 self.log_error(f"Error in processing packets: {e}")
@@ -754,7 +757,16 @@ class FloodDetector:
         return features
     
     def reset_aggregated_data(self):
-        """Reset all aggregated data for the next cycle."""
+        """Reset all aggregated data for the next interval."""
+        # Calculate the most common protocol before resetting
+        if self.protocols:
+            self.protocol = max(set(self.protocols), key=self.protocols.count)
+        else:
+            self.protocol = None
+            
+        # Reset protocol tracking
+        self.protocols = []
+        
         # Reset packet counts and sizes
         self.fwd_packet_count, self.bwd_packet_count = 0, 0
         self.fwd_packet_sizes, self.bwd_packet_sizes = [], []
@@ -810,9 +822,6 @@ class FloodDetector:
         self.fd_util = 0
         self.io_wait = 0
         self.load_avg = 0
-
-        # Reset the protocol attribute
-        self.protocol = ""
 
         # Reset labels
         self.labels = []

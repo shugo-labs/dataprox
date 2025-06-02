@@ -50,7 +50,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
     mongodbUri: '',
     mongodbDatabase: '',
     mongodbCollection: '',
-    mongodbTgenIp: '',
+    tgenPrivateIp: '',
     autoRestart: true,
     nodeIndex: '0',
     tgenPublicIp: '',
@@ -264,7 +264,7 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
         mongodbUri: '',
         mongodbDatabase: '',
         mongodbCollection: '',
-        mongodbTgenIp: '',
+        tgenPrivateIp: '',
         autoRestart: true,
         nodeIndex: '0',
         tgenPublicIp: '',
@@ -469,8 +469,8 @@ const DataCollection: React.FC<DataCollectionProps> = () => {
             <TextField
               fullWidth
               label="Tgen Private IP"
-              name="mongodbTgenIp"
-              value={formData.mongodbTgenIp}
+              name="tgenPrivateIp"
+              value={formData.tgenPrivateIp}
               onChange={handleInputChange}
               required
               helperText="Private IP of the traffic generator machine"

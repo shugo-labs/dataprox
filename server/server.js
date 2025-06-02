@@ -206,6 +206,7 @@ function addDataCollectionInstance(pid, sshConfig, nodeIndex, tgenPublicIp) {
     machineIp: sshConfig.sshHost,
     nodeIndex: parseInt(nodeIndex),
     tgenPublicIp,
+    tgenPrivateIp: sshConfig.mongodbTgenIp, // Add the private IP from the form data
     instanceKey
   };
 
@@ -862,7 +863,7 @@ app.get('/api/traffic-generator/verify-instances', async (req, res) => {
 app.post('/api/data-collection/run', async (req, res) => {
   let ssh = null;
   try {
-    const { mongodbUri, mongodbDatabase, mongodbCollection, autoRestart, nodeIndex, tgenPublicIp, ...sshConfig } = req.body;
+    const { mongodbUri, mongodbDatabase, mongodbCollection, autoRestart, nodeIndex, tgenPublicIp, tgenPrivateIp, ...sshConfig } = req.body;
     
     // Check if this machine already has a running instance for this node
     if (isDataCollectionRunning(sshConfig.sshHost, nodeIndex)) {
@@ -923,7 +924,7 @@ app.post('/api/data-collection/run', async (req, res) => {
 MONGODB_URI=${mongodbUri}
 MONGODB_DATABASE=${mongodbDatabase}
 MONGODB_COLLECTION=${mongodbCollection}
-MONGODB_TGEN_IP=${sshConfig.mongodbTgenIp}
+MONGODB_TGEN_IP=${tgenPrivateIp}
 INTERFACE=${sshConfig.interface}
 SSH_HOST_PRIVATE_IP=${sshConfig.sshHostPrivateIp}
 AUTO_RESTART=${autoRestart}
@@ -1043,7 +1044,7 @@ except Exception as e:
     }
 
     // Add to running instances
-    const instance = addDataCollectionInstance(pid, sshConfig, nodeIndex, tgenPublicIp);
+    const instance = addDataCollectionInstance(pid, { ...sshConfig, mongodbTgenIp: tgenPrivateIp }, nodeIndex, tgenPublicIp);
 
     res.json({ 
       message: 'Data collection started successfully',

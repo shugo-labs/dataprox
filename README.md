@@ -55,8 +55,8 @@ dataprox/
 ├── src/                   # React frontend (client)
 ├── TrafficGenerator/      # Traffic generation scripts (Python, Bash)
 │   ├── run_traffic.sh
-│   ├── traffic_generator_training.py
-│   └── generate_playlist.py
+│   └── traffic_generator_training.py
+│   
 ├── TrafficLogger/         # Data collection scripts (Python)
 │   └── collect_features.py
 ├── gre_setup.py           # Shared GRE tunnel setup logic (Python)

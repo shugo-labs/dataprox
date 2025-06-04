@@ -60,7 +60,7 @@ dataprox/
 ├── TrafficLogger/         # Data collection scripts (Python)
 │   └── collect_features.py
 ├── gre_setup.py           # Shared GRE tunnel setup logic (Python)
-├── run_gre_moat.py        # (Optional) GRE tunnel runner
+├── run_gre_moat.py        # GRE tunnel runner on Moat
 └── README.md
 ```
 

@@ -69,7 +69,7 @@ dataprox/
 ## Prerequisites
 
 - **Node.js** v16+ (for backend/frontend)
-- **Python** 3.8+ (on all remote machines)
+- **Python** 3.10+ (on all remote machines)
 - **MongoDB** (for data collection)
 - **SSH** access (with password or key) to all remote machines
 - **sudo/root** privileges on remote machines (for GRE setup)
